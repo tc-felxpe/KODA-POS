@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  --color-koda-900: #1B004B;
+  --color-koda-800: #4C007D;
+  --color-koda-700: #7F00B2;
+  --color-koda-500: #BC4ED8;
+  --color-koda-300: #F988FF;
+  --color-koda-100: #F3E8FF;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
