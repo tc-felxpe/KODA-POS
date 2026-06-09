@@ -17,6 +17,7 @@ interface Product {
   imageUrl: string | null;
   category: { id: string; name: string } | null;
   inventory: { stock: number } | null;
+  minStock: number;
 }
 
 /* ---------- Iconos ---------- */
@@ -101,6 +102,8 @@ export default function POSPage() {
   const [creatingClient, setCreatingClient] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [saleSuccess, setSaleSuccess] = useState(false);
+  const [allowNegativeStock, setAllowNegativeStock] = useState(false);
+  const [stockError, setStockError] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
 
   /* Escáner USB/Bluetooth: captura cualquier input cuando el search tiene focus */
@@ -239,7 +242,20 @@ export default function POSPage() {
     }
   };
 
+  /* Validar stock antes de agregar */
+  const getAvailableStock = (productId: string) => {
+    const product = products.find((p) => p.id === productId);
+    const inCart = cart.items.find((i) => i.productId === productId)?.quantity || 0;
+    return (product?.inventory?.stock || 0) - inCart;
+  };
+
   const handleAddProduct = (product: Product) => {
+    const available = getAvailableStock(product.id);
+    if (available <= 0 && !allowNegativeStock) {
+      setStockError(`"${product.name}" no tiene stock disponible`);
+      setTimeout(() => setStockError(''), 3000);
+      return;
+    }
     cart.addItem({
       productId: product.id,
       name: product.name,
@@ -349,32 +365,53 @@ export default function POSPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {filteredProducts.map((product) => (
-                <div
-                  key={product.id}
-                  className="bg-white rounded-2xl p-3 shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <div className="aspect-square bg-slate-100 rounded-xl mb-3 flex items-center justify-center overflow-hidden">
-                    {product.imageUrl ? (
-                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-3xl">🧁</span>
-                    )}
+              {filteredProducts.map((product) => {
+                const available = getAvailableStock(product.id);
+                const isOutOfStock = available <= 0;
+                const isLowStock = !isOutOfStock && available <= (product.minStock || 0);
+                return (
+                  <div
+                    key={product.id}
+                    className={`bg-white rounded-2xl p-3 shadow-sm hover:shadow-md transition-shadow relative ${isOutOfStock && !allowNegativeStock ? 'opacity-60' : ''}`}
+                  >
+                    {/* Indicador de stock */}
+                    <div className="absolute top-2 right-2 z-10">
+                      {isOutOfStock ? (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded-lg">AGOTADO</span>
+                      ) : isLowStock ? (
+                        <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-[10px] font-bold rounded-lg">BAJO: {available}</span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-lg">{available}</span>
+                      )}
+                    </div>
+
+                    <div className="aspect-square bg-slate-100 rounded-xl mb-3 flex items-center justify-center overflow-hidden">
+                      {product.imageUrl ? (
+                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-3xl">🧁</span>
+                      )}
+                    </div>
+                    <p className="text-sm font-medium text-[#1B004B] line-clamp-1">{product.name}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-sm font-bold text-[#1B004B]">
+                        ${Number(product.salePrice).toLocaleString()}
+                      </span>
+                      <button
+                        onClick={() => handleAddProduct(product)}
+                        disabled={isOutOfStock && !allowNegativeStock}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                          isOutOfStock && !allowNegativeStock
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            : 'bg-[#1B004B] text-white hover:bg-[#4C007D]'
+                        }`}
+                      >
+                        <PlusIcon />
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-sm font-medium text-[#1B004B] line-clamp-1">{product.name}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-sm font-bold text-[#1B004B]">
-                      ${Number(product.salePrice).toLocaleString()}
-                    </span>
-                    <button
-                      onClick={() => handleAddProduct(product)}
-                      className="w-8 h-8 rounded-full bg-[#1B004B] text-white flex items-center justify-center hover:bg-[#4C007D] transition-colors"
-                    >
-                      <PlusIcon />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -476,8 +513,19 @@ export default function POSPage() {
         </div>
 
         {/* Totales */}
+        {/* Configuración stock */}
+        <div className="flex items-center justify-between py-2">
+          <span className="text-xs text-slate-500">Permitir stock negativo</span>
+          <button
+            onClick={() => setAllowNegativeStock(!allowNegativeStock)}
+            className={`w-10 h-5 rounded-full transition-colors relative ${allowNegativeStock ? 'bg-[#7F00B2]' : 'bg-slate-300'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${allowNegativeStock ? 'translate-x-5' : ''}`} />
+          </button>
+        </div>
+
         {/* Acciones del carrito */}
-        <div className="mt-4 pt-4 border-t border-slate-100 flex gap-2">
+        <div className="mt-2 pt-3 border-t border-slate-100 flex gap-2">
           <button
             onClick={() => setShowPromotions(true)}
             disabled={cart.items.length === 0}
@@ -641,6 +689,17 @@ export default function POSPage() {
           </div>
 
           <div className="p-5 border-t border-slate-100 space-y-3">
+            {/* Config stock móvil */}
+            <div className="flex items-center justify-between py-1">
+              <span className="text-xs text-slate-500">Permitir stock negativo</span>
+              <button
+                onClick={() => setAllowNegativeStock(!allowNegativeStock)}
+                className={`w-10 h-5 rounded-full transition-colors relative ${allowNegativeStock ? 'bg-[#7F00B2]' : 'bg-slate-300'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${allowNegativeStock ? 'translate-x-5' : ''}`} />
+              </button>
+            </div>
+
             {/* Acciones */}
             <div className="flex gap-2">
               <button
@@ -934,6 +993,18 @@ export default function POSPage() {
             <polyline points="20 6 9 17 4 12" />
           </svg>
           <span className="text-sm font-medium">Venta registrada exitosamente</span>
+        </div>
+      )}
+
+      {/* ========== TOAST ERROR STOCK ========== */}
+      {stockError && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[70] bg-red-500 text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+          </svg>
+          <span className="text-sm font-medium">{stockError}</span>
         </div>
       )}
 
