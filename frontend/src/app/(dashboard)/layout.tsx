@@ -189,8 +189,8 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen flex bg-[#F8F7FA]">
-      {/* Sidebar minimalista */}
-      <aside className="w-16 bg-white border-r border-slate-100 flex flex-col items-center py-5 fixed h-full z-50">
+      {/* Sidebar flotante tipo cápsula / cilindro */}
+      <aside className="fixed left-4 top-4 bottom-4 w-16 bg-white rounded-[32px] shadow-[0_4px_24px_rgba(0,0,0,0.06)] z-50 flex flex-col items-center py-5">
         {/* Logo */}
         <Link href="/" className="mb-6">
           <div className="w-8 h-8 rounded-full bg-[#7F00B2] flex items-center justify-center text-white font-bold text-sm">
@@ -198,23 +198,21 @@ export default function DashboardLayout({
           </div>
         </Link>
 
-        {/* Navegación principal — con scroll si es necesario */}
+        {/* Navegación principal */}
         <nav className="flex-1 flex flex-col items-center gap-3 w-full px-2 overflow-y-auto no-scrollbar">
           <NavGroup items={mainNav} pathname={pathname} />
 
-          {/* Separador sutil */}
           <div className="w-6 h-px bg-slate-100 my-1" />
 
           <NavGroup items={managementNav} pathname={pathname} />
 
-          {/* Separador sutil */}
           <div className="w-6 h-px bg-slate-100 my-1" />
 
           <NavGroup items={systemNav} pathname={pathname} />
         </nav>
 
-        {/* Cerrar sesión — al fondo */}
-        <div className="mt-4 pt-3 border-t border-slate-100 w-full flex justify-center">
+        {/* Cerrar sesión */}
+        <div className="mt-3 pt-3 w-full flex justify-center">
           <button
             onClick={logout}
             title="Cerrar sesión"
@@ -225,8 +223,8 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 ml-16 p-8 min-h-screen">
+      {/* Main content — margen para dejar espacio al sidebar flotante */}
+      <main className="flex-1 ml-[88px] p-8 min-h-screen">
         {children}
       </main>
     </div>
