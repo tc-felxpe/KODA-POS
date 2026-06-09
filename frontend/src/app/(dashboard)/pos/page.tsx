@@ -91,6 +91,8 @@ export default function POSPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [showScanner, setShowScanner] = useState(false);
   const [showCartMobile, setShowCartMobile] = useState(false);
+  const [showSuspended, setShowSuspended] = useState(false);
+  const [showPromotions, setShowPromotions] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   /* Escáner USB/Bluetooth: captura cualquier input cuando el search tiene focus */
@@ -167,6 +169,7 @@ export default function POSPage() {
   /* Totales */
   const subtotal = cart.getSubtotal();
   const totalDiscount = cart.getTotalDiscount();
+  const globalDiscount = cart.getGlobalDiscount();
   const totalTax = cart.getTotalTax();
   const total = cart.getTotal();
   const itemCount = cart.getItemCount();
@@ -356,6 +359,57 @@ export default function POSPage() {
         </div>
 
         {/* Totales */}
+        {/* Acciones del carrito */}
+        <div className="mt-4 pt-4 border-t border-slate-100 flex gap-2">
+          <button
+            onClick={() => setShowPromotions(true)}
+            disabled={cart.items.length === 0}
+            className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium hover:bg-slate-200 disabled:opacity-40 transition-colors"
+          >
+            Promociones
+          </button>
+          <button
+            onClick={() => cart.suspendSale()}
+            disabled={cart.items.length === 0}
+            className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium hover:bg-slate-200 disabled:opacity-40 transition-colors"
+          >
+            Suspender
+          </button>
+          {cart.suspendedSales.length > 0 && (
+            <button
+              onClick={() => setShowSuspended(true)}
+              className="relative flex-1 py-2.5 bg-[#F3E8FF] text-[#7F00B2] rounded-xl text-xs font-medium hover:bg-[#E9D5FF] transition-colors"
+            >
+              Recuperar
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#7F00B2] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                {cart.suspendedSales.length}
+              </span>
+            </button>
+          )}
+        </div>
+
+        {/* Descuento global */}
+        {(cart.globalDiscount > 0 || showPromotions) && (
+          <div className="flex gap-2 mt-3">
+            <input
+              type="number"
+              placeholder="Desc. global"
+              value={cart.globalDiscount || ''}
+              onChange={(e) => cart.setGlobalDiscount(Number(e.target.value), cart.globalDiscountType)}
+              className="flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#BC4ED8]"
+            />
+            <select
+              value={cart.globalDiscountType}
+              onChange={(e) => cart.setGlobalDiscount(cart.globalDiscount, e.target.value as 'value' | 'percent')}
+              className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#BC4ED8]"
+            >
+              <option value="value">$</option>
+              <option value="percent">%</option>
+            </select>
+          </div>
+        )}
+
+        {/* Totales */}
         <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
           <div className="flex justify-between text-sm text-slate-500">
             <span>Subtotal</span>
@@ -363,8 +417,14 @@ export default function POSPage() {
           </div>
           {totalDiscount > 0 && (
             <div className="flex justify-between text-sm text-red-500">
-              <span>Descuento</span>
+              <span>Desc. por producto</span>
               <span className="font-medium">-${totalDiscount.toLocaleString()}</span>
+            </div>
+          )}
+          {globalDiscount > 0 && (
+            <div className="flex justify-between text-sm text-red-500">
+              <span>Desc. global</span>
+              <span className="font-medium">-${globalDiscount.toLocaleString()}</span>
             </div>
           )}
           {totalTax > 0 && (
@@ -463,14 +523,40 @@ export default function POSPage() {
             )}
           </div>
 
-          <div className="p-5 border-t border-slate-100 space-y-2">
+          <div className="p-5 border-t border-slate-100 space-y-3">
+            {/* Acciones */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowCartMobile(false); setShowPromotions(true); }}
+                disabled={cart.items.length === 0}
+                className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium disabled:opacity-40"
+              >
+                Promociones
+              </button>
+              <button
+                onClick={() => { cart.suspendSale(); setShowCartMobile(false); }}
+                disabled={cart.items.length === 0}
+                className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium disabled:opacity-40"
+              >
+                Suspender
+              </button>
+            </div>
+
+            {/* Descuento global móvil */}
+            {cart.globalDiscount > 0 && (
+              <div className="flex justify-between text-sm text-red-500">
+                <span>Desc. global ({cart.globalDiscount}{cart.globalDiscountType === 'percent' ? '%' : '$'})</span>
+                <span className="font-medium">-${globalDiscount.toLocaleString()}</span>
+              </div>
+            )}
+
             <div className="flex justify-between text-sm text-slate-500">
               <span>Subtotal</span>
               <span className="font-medium text-[#1B004B]">${subtotal.toLocaleString()}</span>
             </div>
             {totalDiscount > 0 && (
               <div className="flex justify-between text-sm text-red-500">
-                <span>Descuento</span>
+                <span>Desc. por producto</span>
                 <span className="font-medium">-${totalDiscount.toLocaleString()}</span>
               </div>
             )}
@@ -490,6 +576,114 @@ export default function POSPage() {
             >
               Continue
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========== MODAL VENTAS SUSPENDIDAS ========== */}
+      {showSuspended && (
+        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[#1B004B]">Ventas suspendidas</h3>
+              <button
+                onClick={() => setShowSuspended(false)}
+                className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-3">
+              {cart.suspendedSales.length === 0 ? (
+                <p className="text-center text-slate-400 text-sm py-8">No hay ventas suspendidas</p>
+              ) : (
+                cart.suspendedSales.map((sale) => (
+                  <div key={sale.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                    <div className="w-10 h-10 rounded-full bg-[#F3E8FF] flex items-center justify-center text-[#7F00B2] text-xs font-bold">
+                      {sale.items.length}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[#1B004B]">
+                        {sale.items.length} producto{sale.items.length !== 1 ? 's' : ''}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {new Date(sale.createdAt).toLocaleString('es-CO', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => { cart.resumeSale(sale.id); setShowSuspended(false); }}
+                      className="px-4 py-2 bg-[#7F00B2] text-white rounded-xl text-xs font-medium hover:bg-[#4C007D] transition-colors"
+                    >
+                      Recuperar
+                    </button>
+                    <button
+                      onClick={() => cart.deleteSuspendedSale(sale.id)}
+                      className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-red-400 hover:border-red-200 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                      </svg>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== MODAL PROMOCIONES ========== */}
+      {showPromotions && (
+        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[#1B004B]">Promociones</h3>
+              <button
+                onClick={() => setShowPromotions(false)}
+                className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Descuento por porcentaje</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[10, 20, 30].map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => { cart.setGlobalDiscount(p, 'percent'); setShowPromotions(false); }}
+                    className="py-3 bg-slate-50 rounded-xl text-sm font-medium text-[#1B004B] hover:bg-[#F3E8FF] hover:text-[#7F00B2] transition-colors"
+                  >
+                    {p}%
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider pt-2">Descuento por valor</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[5000, 10000, 15000, 20000].map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => { cart.setGlobalDiscount(v, 'value'); setShowPromotions(false); }}
+                    className="py-3 bg-slate-50 rounded-xl text-sm font-medium text-[#1B004B] hover:bg-[#F3E8FF] hover:text-[#7F00B2] transition-colors"
+                  >
+                    ${v.toLocaleString()}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => { cart.setGlobalDiscount(0, 'value'); setShowPromotions(false); }}
+                className="w-full py-3 text-sm text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+              >
+                Quitar descuento
+              </button>
+            </div>
           </div>
         </div>
       )}
