@@ -82,7 +82,7 @@ const PlusCircleIcon = () => (
 
 /* ---------- Componente principal ---------- */
 export default function POSPage() {
-  const { user } = useAuth();
+  const { user, tenant } = useAuth();
   const cart = useCart();
 
   const [search, setSearch] = useState('');
@@ -93,6 +93,11 @@ export default function POSPage() {
   const [showCartMobile, setShowCartMobile] = useState(false);
   const [showSuspended, setShowSuspended] = useState(false);
   const [showPromotions, setShowPromotions] = useState(false);
+  const [showClientSelect, setShowClientSelect] = useState(false);
+  const [showClientCreate, setShowClientCreate] = useState(false);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [creatingClient, setCreatingClient] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   /* Escáner USB/Bluetooth: captura cualquier input cuando el search tiene focus */
@@ -116,6 +121,20 @@ export default function POSPage() {
     setSearch(code);
     fetchProducts(code);
   };
+
+  /* Cargar clientes */
+  const fetchCustomers = useCallback(async (q: string) => {
+    try {
+      const res = await api.get('/customers', { params: { search: q } });
+      setCustomers(res.data);
+    } catch {
+      setCustomers([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCustomers('');
+  }, [fetchCustomers]);
 
   /* Cargar productos */
   const fetchProducts = useCallback(async (q: string) => {
@@ -155,6 +174,35 @@ export default function POSPage() {
   }, [products, selectedCategory]);
 
   /* Agregar al carrito */
+  const handleCreateClient = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const data = {
+      firstName: (form as any).firstName.value,
+      lastName: (form as any).lastName.value,
+      email: (form as any).email.value || null,
+      phone: (form as any).phone.value || null,
+      taxId: (form as any).document.value || null,
+    };
+    setCreatingClient(true);
+    try {
+      const res = await api.post('/customers', data);
+      cart.setClient({
+        id: res.data.id,
+        firstName: res.data.firstName,
+        lastName: res.data.lastName,
+        email: res.data.email,
+        phone: res.data.phone,
+        document: res.data.taxId,
+        balance: Number(res.data.balance) || 0,
+      });
+      setShowClientCreate(false);
+      fetchCustomers('');
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
   const handleAddProduct = (product: Product) => {
     cart.addItem({
       productId: product.id,
@@ -301,16 +349,49 @@ export default function POSPage() {
         <h2 className="text-xl font-bold text-[#1B004B] mb-4">Current Order</h2>
 
         {/* Cliente */}
-        <div className="flex items-center gap-3 mb-5 pb-4 border-b border-slate-100">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#7F00B2] to-[#BC4ED8] flex items-center justify-center text-white text-sm font-bold">
-            {user?.firstName?.[0] || 'C'}
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-[#1B004B]">
-              {user ? `${user.firstName} ${user.lastName}` : 'Cliente general'}
-            </p>
-            <p className="text-xs text-slate-400">Venta rápida</p>
-          </div>
+        <div className="mb-5 pb-4 border-b border-slate-100">
+          {cart.client ? (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#7F00B2] to-[#BC4ED8] flex items-center justify-center text-white text-sm font-bold">
+                {cart.client.firstName[0]}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-[#1B004B] truncate">
+                  {cart.client.firstName} {cart.client.lastName}
+                </p>
+                {cart.client.document && <p className="text-xs text-slate-400">CC: {cart.client.document}</p>}
+                {cart.client.balance > 0 && <p className="text-xs text-red-500">Saldo: ${cart.client.balance.toLocaleString()}</p>}
+              </div>
+              <button
+                onClick={() => cart.clearClient()}
+                className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-sm font-bold">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-[#1B004B]">Cliente general</p>
+                <p className="text-xs text-slate-400">Venta rápida sin registrar</p>
+              </div>
+              <button
+                onClick={() => setShowClientSelect(true)}
+                className="px-3 py-1.5 bg-[#F3E8FF] text-[#7F00B2] rounded-lg text-xs font-medium hover:bg-[#E9D5FF] transition-colors"
+              >
+                Cambiar
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Items */}
@@ -684,6 +765,118 @@ export default function POSPage() {
                 Quitar descuento
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== MODAL SELECCIONAR CLIENTE ========== */}
+      {showClientSelect && (
+        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[#1B004B]">Seleccionar cliente</h3>
+              <button
+                onClick={() => setShowClientSelect(false)}
+                className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="relative mb-4">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                <SearchIcon />
+              </div>
+              <input
+                type="text"
+                value={customerSearch}
+                onChange={(e) => { setCustomerSearch(e.target.value); fetchCustomers(e.target.value); }}
+                placeholder="Buscar cliente..."
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]"
+              />
+            </div>
+
+            <button
+              onClick={() => { setShowClientSelect(false); setShowClientCreate(true); }}
+              className="w-full py-3 mb-3 bg-[#1B004B] text-white rounded-xl text-sm font-medium hover:bg-[#4C007D] transition-colors"
+            >
+              + Crear cliente nuevo
+            </button>
+
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {customers.length === 0 ? (
+                <p className="text-center text-slate-400 text-sm py-8">No se encontraron clientes</p>
+              ) : (
+                customers.map((c: any) => (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      cart.setClient({
+                        id: c.id,
+                        firstName: c.firstName,
+                        lastName: c.lastName,
+                        email: c.email,
+                        phone: c.phone,
+                        document: c.taxId,
+                        balance: Number(c.balance) || 0,
+                      });
+                      setShowClientSelect(false);
+                    }}
+                    className="w-full flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-[#F3E8FF] transition-colors text-left"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#7F00B2] to-[#BC4ED8] flex items-center justify-center text-white text-sm font-bold shrink-0">
+                      {c.firstName[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[#1B004B] truncate">{c.firstName} {c.lastName}</p>
+                      <p className="text-xs text-slate-400">{c.phone || c.email || 'Sin contacto'}</p>
+                    </div>
+                    {Number(c.balance) > 0 && (
+                      <span className="text-xs text-red-500 font-medium">${Number(c.balance).toLocaleString()}</span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== MODAL CREAR CLIENTE ========== */}
+      {showClientCreate && (
+        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[#1B004B]">Crear cliente</h3>
+              <button
+                onClick={() => setShowClientCreate(false)}
+                className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <form onSubmit={handleCreateClient} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <input name="firstName" required placeholder="Nombre" className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+                <input name="lastName" required placeholder="Apellido" className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+              </div>
+              <input name="document" placeholder="Documento / NIT" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+              <input name="phone" placeholder="Teléfono" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+              <input name="email" type="email" placeholder="Correo electrónico" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+              <button
+                type="submit"
+                disabled={creatingClient}
+                className="w-full py-3 bg-[#7F00B2] text-white rounded-xl font-medium text-sm hover:bg-[#4C007D] disabled:opacity-50 transition-colors"
+              >
+                {creatingClient ? 'Guardando...' : 'Guardar cliente'}
+              </button>
+            </form>
           </div>
         </div>
       )}

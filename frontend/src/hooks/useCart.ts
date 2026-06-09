@@ -1,6 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export interface CartClient {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  document: string | null;
+  balance: number;
+}
+
 export interface CartItem {
   productId: string;
   name: string;
@@ -29,6 +39,7 @@ interface CartState {
   observations: string;
   globalDiscount: number;
   globalDiscountType: 'value' | 'percent';
+  client: CartClient | null;
   suspendedSales: SuspendedSale[];
 
   addItem: (item: Omit<CartItem, 'quantity' | 'discount' | 'discountType' | 'tax'>) => void;
@@ -38,6 +49,8 @@ interface CartState {
   updateTax: (productId: string, tax: number) => void;
   setObservations: (text: string) => void;
   setGlobalDiscount: (discount: number, type: 'value' | 'percent') => void;
+  setClient: (client: CartClient | null) => void;
+  clearClient: () => void;
   clearCart: () => void;
 
   suspendSale: () => void;
@@ -59,6 +72,7 @@ export const useCart = create<CartState>()(
       observations: '',
       globalDiscount: 0,
       globalDiscountType: 'value',
+      client: null,
       suspendedSales: [],
 
       addItem: (product) => {
@@ -120,7 +134,10 @@ export const useCart = create<CartState>()(
 
       setGlobalDiscount: (discount, type) => set({ globalDiscount: discount, globalDiscountType: type }),
 
-      clearCart: () => set({ items: [], observations: '', globalDiscount: 0, globalDiscountType: 'value' }),
+      setClient: (client) => set({ client }),
+      clearClient: () => set({ client: null }),
+
+      clearCart: () => set({ items: [], observations: '', globalDiscount: 0, globalDiscountType: 'value', client: null }),
 
       suspendSale: () => {
         const state = get();
@@ -140,6 +157,7 @@ export const useCart = create<CartState>()(
           observations: '',
           globalDiscount: 0,
           globalDiscountType: 'value',
+          client: null,
         }));
       },
 
