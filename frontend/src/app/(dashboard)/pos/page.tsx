@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import api from '@/lib/axios';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
+import BarcodeScanner from '@/components/BarcodeScanner';
 
 /* ---------- Tipos ---------- */
 interface Product {
@@ -19,44 +20,63 @@ interface Product {
 
 /* ---------- Iconos ---------- */
 const SearchIcon = () => (
-  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
     <circle cx="11" cy="11" r="8" />
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
 
+const SlidersIcon = () => (
+  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+    <line x1="4" y1="21" x2="4" y2="14" />
+    <line x1="4" y1="10" x2="4" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="12" />
+    <line x1="12" y1="8" x2="12" y2="3" />
+    <line x1="20" y1="21" x2="20" y2="16" />
+    <line x1="20" y1="12" x2="20" y2="3" />
+    <line x1="1" y1="14" x2="7" y2="14" />
+    <line x1="9" y1="8" x2="15" y2="8" />
+    <line x1="17" y1="16" x2="23" y2="16" />
+  </svg>
+);
+
+const CameraIcon = () => (
+  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+    <circle cx="12" cy="13" r="4" />
+  </svg>
+);
+
+const ChevronDownIcon = () => (
+  <svg className="w-4 h-4 text-[#1B004B]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+const ChevronRightIcon = () => (
+  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
+
 const MinusIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
     <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 );
 
 const PlusIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
     <line x1="12" y1="5" x2="12" y2="19" />
     <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 );
 
-const TrashIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-  </svg>
-);
-
-const CartIcon = ({ count }: { count: number }) => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-    <circle cx="9" cy="21" r="1" />
-    <circle cx="20" cy="21" r="1" />
-    <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
+const PlusCircleIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="8" x2="12" y2="16" />
+    <line x1="8" y1="12" x2="16" y2="12" />
   </svg>
 );
 
@@ -69,8 +89,31 @@ export default function POSPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [showScanner, setShowScanner] = useState(false);
   const [showCartMobile, setShowCartMobile] = useState(false);
-  const [observations, setObservations] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  /* Escáner USB/Bluetooth: captura cualquier input cuando el search tiene focus */
+  useEffect(() => {
+    const input = searchRef.current;
+    if (!input) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      /* Los lectores de código de barras envían Enter al final */
+      if (e.key === 'Enter' && input.value.trim()) {
+        e.preventDefault();
+        handleBarcodeScan(input.value.trim());
+      }
+    };
+
+    input.addEventListener('keydown', handleKeyDown);
+    return () => input.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleBarcodeScan = (code: string) => {
+    setSearch(code);
+    fetchProducts(code);
+  };
 
   /* Cargar productos */
   const fetchProducts = useCallback(async (q: string) => {
@@ -94,7 +137,7 @@ export default function POSPage() {
     return () => clearTimeout(timer);
   }, [search, fetchProducts]);
 
-  /* Categorías únicas de los productos cargados */
+  /* Categorías únicas */
   const categories = useMemo(() => {
     const map = new Map<string, string>();
     products.forEach((p) => {
@@ -103,13 +146,13 @@ export default function POSPage() {
     return Array.from(map.entries());
   }, [products]);
 
-  /* Productos filtrados por categoría */
+  /* Productos filtrados */
   const filteredProducts = useMemo(() => {
     if (!selectedCategory) return products;
     return products.filter((p) => p.category?.id === selectedCategory);
   }, [products, selectedCategory]);
 
-  /* Agregar producto al carrito */
+  /* Agregar al carrito */
   const handleAddProduct = (product: Product) => {
     cart.addItem({
       productId: product.id,
@@ -130,32 +173,54 @@ export default function POSPage() {
 
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col lg:flex-row gap-4">
-      {/* ========== PANEL IZQUIERDO: PRODUCTOS ========== */}
-      <div className="flex-1 flex flex-col min-h-0 bg-white rounded-2xl shadow-sm border border-slate-100">
-        {/* Header de búsqueda */}
-        <div className="p-4 border-b border-slate-100 space-y-3">
-          <div className="relative">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2">
-              <SearchIcon />
+      {/* ========== ÁREA CENTRAL: PRODUCTOS ========== */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Header */}
+        <div className="mb-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-[#7F00B2] tracking-wide">Items</p>
+              <button className="flex items-center gap-1 text-2xl font-bold text-[#1B004B]">
+                Productos
+                <ChevronDownIcon />
+              </button>
             </div>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por nombre, SKU o código de barras..."
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8] focus:ring-2 focus:ring-[#F3E8FF] transition-all"
-            />
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                  <SearchIcon />
+                </div>
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar producto..."
+                  className="w-48 sm:w-64 pl-10 pr-10 py-2.5 bg-white border-none rounded-2xl text-sm outline-none shadow-sm focus:ring-2 focus:ring-[#F3E8FF] transition-all"
+                />
+                <button
+                  onClick={() => setShowScanner(true)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl hover:bg-slate-100 flex items-center justify-center transition-colors"
+                  title="Escanear con cámara"
+                >
+                  <CameraIcon />
+                </button>
+              </div>
+              <button className="w-10 h-10 bg-white rounded-2xl shadow-sm flex items-center justify-center hover:bg-slate-50 transition-colors">
+                <SlidersIcon />
+              </button>
+            </div>
           </div>
 
-          {/* Categorías rápidas */}
+          {/* Categorías */}
           {categories.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
               <button
                 onClick={() => setSelectedCategory('')}
-                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`shrink-0 px-5 py-2 rounded-xl text-sm font-medium transition-all ${
                   selectedCategory === ''
-                    ? 'bg-[#1B004B] text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-[#1B004B] text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 Todos
@@ -164,21 +229,24 @@ export default function POSPage() {
                 <button
                   key={id}
                   onClick={() => setSelectedCategory(id)}
-                  className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`shrink-0 px-5 py-2 rounded-xl text-sm font-medium transition-all ${
                     selectedCategory === id
-                      ? 'bg-[#1B004B] text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      ? 'bg-[#1B004B] text-white shadow-sm'
+                      : 'bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
                   {name}
                 </button>
               ))}
+              <button className="shrink-0 w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                <ChevronRightIcon />
+              </button>
             </div>
           )}
         </div>
 
-        {/* Grid de productos */}
-        <div className="flex-1 overflow-y-auto p-4">
+        {/* Grid productos */}
+        <div className="flex-1 overflow-y-auto pb-4">
           {loading ? (
             <div className="flex items-center justify-center h-40">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#7F00B2]"></div>
@@ -193,157 +261,127 @@ export default function POSPage() {
               <p className="text-sm">No se encontraron productos</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {filteredProducts.map((product) => (
-                <button
+                <div
                   key={product.id}
-                  onClick={() => handleAddProduct(product)}
-                  className="group flex flex-col bg-white border border-slate-100 rounded-xl p-3 hover:shadow-md hover:border-[#E9D5FF] transition-all text-left"
+                  className="bg-white rounded-2xl p-3 shadow-sm hover:shadow-md transition-shadow"
                 >
-                  <div className="aspect-square bg-slate-50 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
+                  <div className="aspect-square bg-slate-100 rounded-xl mb-3 flex items-center justify-center overflow-hidden">
                     {product.imageUrl ? (
                       <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-2xl">📦</span>
+                      <span className="text-3xl">🧁</span>
                     )}
                   </div>
-                  <p className="text-sm font-medium text-[#1B004B] line-clamp-2 leading-tight">{product.name}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{product.sku || product.barcode || 'Sin código'}</p>
-                  <div className="flex items-center justify-between mt-auto pt-2">
-                    <span className="text-sm font-bold text-[#7F00B2]">
+                  <p className="text-sm font-medium text-[#1B004B] line-clamp-1">{product.name}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-sm font-bold text-[#1B004B]">
                       ${Number(product.salePrice).toLocaleString()}
                     </span>
-                    <span className="w-7 h-7 rounded-full bg-[#1B004B] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => handleAddProduct(product)}
+                      className="w-8 h-8 rounded-full bg-[#1B004B] text-white flex items-center justify-center hover:bg-[#4C007D] transition-colors"
+                    >
                       <PlusIcon />
-                    </span>
+                    </button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* ========== PANEL DERECHO: CARRITO (desktop) ========== */}
-      <div className="hidden lg:flex w-[380px] flex-col bg-white rounded-2xl shadow-sm border border-slate-100">
-        <div className="p-4 border-b border-slate-100">
-          <h2 className="text-base font-semibold text-[#1B004B]">Carrito de venta</h2>
-          <p className="text-xs text-slate-400">{itemCount} {itemCount === 1 ? 'producto' : 'productos'}</p>
+      {/* ========== PANEL DERECHO: CURRENT ORDER (desktop) ========== */}
+      <div className="hidden lg:flex w-[340px] xl:w-[380px] flex-col bg-white rounded-3xl shadow-sm p-5">
+        <h2 className="text-xl font-bold text-[#1B004B] mb-4">Current Order</h2>
+
+        {/* Cliente */}
+        <div className="flex items-center gap-3 mb-5 pb-4 border-b border-slate-100">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#7F00B2] to-[#BC4ED8] flex items-center justify-center text-white text-sm font-bold">
+            {user?.firstName?.[0] || 'C'}
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-[#1B004B]">
+              {user ? `${user.firstName} ${user.lastName}` : 'Cliente general'}
+            </p>
+            <p className="text-xs text-slate-400">Venta rápida</p>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Items */}
+        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
           {cart.items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-slate-400">
-              <CartIcon count={0} />
-              <p className="text-sm mt-2">El carrito está vacío</p>
-              <p className="text-xs">Toca un producto para agregarlo</p>
+            <div className="flex flex-col items-center justify-center h-32 text-slate-400">
+              <svg className="w-10 h-10 mb-2 opacity-40" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <circle cx="9" cy="21" r="1" />
+                <circle cx="20" cy="21" r="1" />
+                <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
+              </svg>
+              <p className="text-xs">El carrito está vacío</p>
             </div>
           ) : (
             cart.items.map((item) => (
-              <div key={item.productId} className="flex gap-3 p-3 bg-slate-50 rounded-xl">
-                <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shrink-0 text-lg">
+              <div key={item.productId} className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover rounded-lg" />
+                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                   ) : (
-                    '📦'
+                    <span className="text-lg">🧁</span>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[#1B004B] truncate">{item.name}</p>
-                  <p className="text-xs text-slate-400">${item.salePrice.toLocaleString()} c/u</p>
-
-                  {/* Controles de cantidad */}
-                  <div className="flex items-center gap-2 mt-2">
-                    <button
-                      onClick={() => cart.updateQuantity(item.productId, item.quantity - 1)}
-                      className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:border-[#BC4ED8] hover:text-[#7F00B2] transition-colors"
-                    >
-                      <MinusIcon />
-                    </button>
-                    <span className="w-8 text-center text-sm font-medium text-[#1B004B]">{item.quantity}</span>
-                    <button
-                      onClick={() => cart.updateQuantity(item.productId, item.quantity + 1)}
-                      className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:border-[#BC4ED8] hover:text-[#7F00B2] transition-colors"
-                    >
-                      <PlusIcon />
-                    </button>
-                    <button
-                      onClick={() => cart.removeItem(item.productId)}
-                      className="ml-auto w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:border-red-200 hover:text-red-500 transition-colors"
-                    >
-                      <TrashIcon />
-                    </button>
-                  </div>
-
-                  {/* Descuento e impuesto por línea */}
-                  <div className="flex gap-2 mt-2">
-                    <input
-                      type="number"
-                      placeholder="Desc."
-                      value={item.discount || ''}
-                      onChange={(e) => cart.updateDiscount(item.productId, Number(e.target.value), item.discountType)}
-                      className="w-16 px-2 py-1 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-[#BC4ED8]"
-                    />
-                    <select
-                      value={item.discountType}
-                      onChange={(e) => cart.updateDiscount(item.productId, item.discount, e.target.value as 'value' | 'percent')}
-                      className="px-2 py-1 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-[#BC4ED8]"
-                    >
-                      <option value="value">$</option>
-                      <option value="percent">%</option>
-                    </select>
-                    <input
-                      type="number"
-                      placeholder="IVA %"
-                      value={item.tax || ''}
-                      onChange={(e) => cart.updateTax(item.productId, Number(e.target.value))}
-                      className="w-16 px-2 py-1 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-[#BC4ED8]"
-                    />
-                  </div>
+                  <p className="text-xs text-slate-500 font-medium">${item.salePrice.toLocaleString()}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => cart.updateQuantity(item.productId, item.quantity - 1)}
+                    className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+                  >
+                    <MinusIcon />
+                  </button>
+                  <span className="w-5 text-center text-sm font-semibold text-[#1B004B]">{item.quantity}</span>
+                  <button
+                    onClick={() => cart.updateQuantity(item.productId, item.quantity + 1)}
+                    className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+                  >
+                    <PlusIcon />
+                  </button>
                 </div>
               </div>
             ))
           )}
         </div>
 
-        {/* Totales y observaciones */}
-        <div className="p-4 border-t border-slate-100 space-y-3">
-          <textarea
-            value={observations}
-            onChange={(e) => setObservations(e.target.value)}
-            placeholder="Observaciones..."
-            rows={2}
-            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#BC4ED8] resize-none"
-          />
-
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between text-slate-500">
-              <span>Subtotal</span>
-              <span>${subtotal.toLocaleString()}</span>
-            </div>
-            {totalDiscount > 0 && (
-              <div className="flex justify-between text-red-500">
-                <span>Descuento</span>
-                <span>-${totalDiscount.toLocaleString()}</span>
-              </div>
-            )}
-            {totalTax > 0 && (
-              <div className="flex justify-between text-slate-500">
-                <span>Impuestos</span>
-                <span>+${totalTax.toLocaleString()}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-base font-bold text-[#1B004B] pt-2 border-t border-slate-100">
-              <span>Total</span>
-              <span>${total.toLocaleString()}</span>
-            </div>
+        {/* Totales */}
+        <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
+          <div className="flex justify-between text-sm text-slate-500">
+            <span>Subtotal</span>
+            <span className="font-medium text-[#1B004B]">${subtotal.toLocaleString()}</span>
           </div>
-
+          {totalDiscount > 0 && (
+            <div className="flex justify-between text-sm text-red-500">
+              <span>Descuento</span>
+              <span className="font-medium">-${totalDiscount.toLocaleString()}</span>
+            </div>
+          )}
+          {totalTax > 0 && (
+            <div className="flex justify-between text-sm text-slate-500">
+              <span>Impuestos</span>
+              <span className="font-medium text-[#1B004B]">${totalTax.toLocaleString()}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-base font-bold text-[#1B004B] pt-2">
+            <span>Total</span>
+            <span>${total.toLocaleString()}</span>
+          </div>
           <button
             disabled={cart.items.length === 0}
-            className="w-full py-3 bg-[#1B004B] text-white rounded-xl font-medium text-sm hover:bg-[#4C007D] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3.5 mt-3 bg-[#7F00B2] text-white rounded-full font-medium text-sm hover:bg-[#4C007D] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-purple-200/50"
           >
-            Continuar al pago
+            Continue
           </button>
         </div>
       </div>
@@ -351,9 +389,13 @@ export default function POSPage() {
       {/* ========== BOTÓN FLOTANTE CARRITO (móvil) ========== */}
       <button
         onClick={() => setShowCartMobile(true)}
-        className="lg:hidden fixed bottom-6 right-6 z-40 w-14 h-14 bg-[#1B004B] text-white rounded-full shadow-lg shadow-purple-300/40 flex items-center justify-center"
+        className="lg:hidden fixed bottom-6 right-6 z-40 w-14 h-14 bg-[#7F00B2] text-white rounded-full shadow-lg shadow-purple-300/40 flex items-center justify-center"
       >
-        <CartIcon count={itemCount} />
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+          <circle cx="9" cy="21" r="1" />
+          <circle cx="20" cy="21" r="1" />
+          <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
+        </svg>
         {itemCount > 0 && (
           <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
             {itemCount}
@@ -364,103 +406,103 @@ export default function POSPage() {
       {/* ========== DRAWER CARRITO (móvil) ========== */}
       {showCartMobile && (
         <div className="lg:hidden fixed inset-0 z-50 flex flex-col bg-white">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-100">
-            <div>
-              <h2 className="text-base font-semibold text-[#1B004B]">Carrito</h2>
-              <p className="text-xs text-slate-400">{itemCount} productos</p>
-            </div>
-            <button onClick={() => setShowCartMobile(false)} className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500">
-              <CloseIcon />
+          <div className="flex items-center justify-between p-5 border-b border-slate-100">
+            <h2 className="text-xl font-bold text-[#1B004B]">Current Order</h2>
+            <button
+              onClick={() => setShowCartMobile(false)}
+              className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </button>
           </div>
 
-          {/* Items */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
             {cart.items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-slate-400">
-                <CartIcon count={0} />
-                <p className="text-sm mt-2">El carrito está vacío</p>
+                <svg className="w-12 h-12 mb-2 opacity-40" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <circle cx="9" cy="21" r="1" />
+                  <circle cx="20" cy="21" r="1" />
+                  <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
+                </svg>
+                <p className="text-sm">El carrito está vacío</p>
               </div>
             ) : (
               cart.items.map((item) => (
-                <div key={item.productId} className="flex gap-3 p-3 bg-slate-50 rounded-xl">
-                  <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shrink-0 text-lg">
+                <div key={item.productId} className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
                     {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover rounded-lg" />
+                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                     ) : (
-                      '📦'
+                      <span className="text-lg">🧁</span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[#1B004B] truncate">{item.name}</p>
-                    <p className="text-xs text-slate-400">${item.salePrice.toLocaleString()} c/u</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <button
-                        onClick={() => cart.updateQuantity(item.productId, item.quantity - 1)}
-                        className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500"
-                      >
-                        <MinusIcon />
-                      </button>
-                      <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                      <button
-                        onClick={() => cart.updateQuantity(item.productId, item.quantity + 1)}
-                        className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500"
-                      >
-                        <PlusIcon />
-                      </button>
-                      <button
-                        onClick={() => cart.removeItem(item.productId)}
-                        className="ml-auto w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-red-400"
-                      >
-                        <TrashIcon />
-                      </button>
-                    </div>
+                    <p className="text-xs text-slate-500 font-medium">${item.salePrice.toLocaleString()}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => cart.updateQuantity(item.productId, item.quantity - 1)}
+                      className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"
+                    >
+                      <MinusIcon />
+                    </button>
+                    <span className="w-5 text-center text-sm font-semibold">{item.quantity}</span>
+                    <button
+                      onClick={() => cart.updateQuantity(item.productId, item.quantity + 1)}
+                      className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"
+                    >
+                      <PlusIcon />
+                    </button>
                   </div>
                 </div>
               ))
             )}
           </div>
 
-          {/* Totales */}
-          <div className="p-4 border-t border-slate-100 space-y-3">
-            <textarea
-              value={observations}
-              onChange={(e) => setObservations(e.target.value)}
-              placeholder="Observaciones..."
-              rows={2}
-              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none"
-            />
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between text-slate-500">
-                <span>Subtotal</span>
-                <span>${subtotal.toLocaleString()}</span>
+          <div className="p-5 border-t border-slate-100 space-y-2">
+            <div className="flex justify-between text-sm text-slate-500">
+              <span>Subtotal</span>
+              <span className="font-medium text-[#1B004B]">${subtotal.toLocaleString()}</span>
+            </div>
+            {totalDiscount > 0 && (
+              <div className="flex justify-between text-sm text-red-500">
+                <span>Descuento</span>
+                <span className="font-medium">-${totalDiscount.toLocaleString()}</span>
               </div>
-              {totalDiscount > 0 && (
-                <div className="flex justify-between text-red-500">
-                  <span>Descuento</span>
-                  <span>-${totalDiscount.toLocaleString()}</span>
-                </div>
-              )}
-              {totalTax > 0 && (
-                <div className="flex justify-between text-slate-500">
-                  <span>Impuestos</span>
-                  <span>+${totalTax.toLocaleString()}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-lg font-bold text-[#1B004B] pt-2 border-t border-slate-100">
-                <span>Total</span>
-                <span>${total.toLocaleString()}</span>
+            )}
+            {totalTax > 0 && (
+              <div className="flex justify-between text-sm text-slate-500">
+                <span>Impuestos</span>
+                <span className="font-medium text-[#1B004B]">${totalTax.toLocaleString()}</span>
               </div>
+            )}
+            <div className="flex justify-between text-lg font-bold text-[#1B004B] pt-2">
+              <span>Total</span>
+              <span>${total.toLocaleString()}</span>
             </div>
             <button
               disabled={cart.items.length === 0}
-              className="w-full py-3.5 bg-[#1B004B] text-white rounded-xl font-medium disabled:opacity-40"
+              className="w-full py-4 mt-2 bg-[#7F00B2] text-white rounded-full font-medium disabled:opacity-40"
             >
-              Continuar al pago
+              Continue
             </button>
           </div>
         </div>
+      )}
+
+      {/* ========== MODAL ESCANER ========== */}
+      {showScanner && (
+        <BarcodeScanner
+          onScan={(code) => {
+            setSearch(code);
+            fetchProducts(code);
+          }}
+          onClose={() => setShowScanner(false)}
+        />
       )}
     </div>
   );
