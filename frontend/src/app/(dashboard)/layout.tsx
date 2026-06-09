@@ -1,11 +1,37 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 
-/* ---------- Iconos outline 20x20, stroke 1.5 ---------- */
+/* ---------- Hook para detectar móvil ---------- */
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+}
+
+/* ---------- Iconos ---------- */
+
+const MenuIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+    <line x1="4" y1="8" x2="20" y2="8" />
+    <line x1="4" y1="16" x2="20" y2="16" />
+  </svg>
+);
+
+const CloseIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
 
 const HomeIcon = ({ active }: { active: boolean }) => (
   <svg className={`w-5 h-5 ${active ? 'text-[#7F00B2]' : 'text-slate-400'}`} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
@@ -111,7 +137,7 @@ const WalletIcon = ({ active }: { active: boolean }) => (
   </svg>
 );
 
-/* ---------- Grupos de navegación ---------- */
+/* ---------- Navegación ---------- */
 
 const mainNav = [
   { href: '/dashboard', icon: HomeIcon, label: 'Dashboard' },
@@ -135,7 +161,7 @@ const systemNav = [
   { href: '/settings', icon: SettingsIcon, label: 'Configuración' },
 ];
 
-function NavGroup({ items, pathname }: { items: typeof mainNav; pathname: string }) {
+function NavGroup({ items, pathname, onClick }: { items: typeof mainNav; pathname: string; onClick?: () => void }) {
   return (
     <div className="flex flex-col items-center gap-1.5 w-full">
       {items.map((item) => {
@@ -146,6 +172,7 @@ function NavGroup({ items, pathname }: { items: typeof mainNav; pathname: string
             key={item.href}
             href={item.href}
             title={item.label}
+            onClick={onClick}
             className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-200 ${
               active
                 ? 'text-[#7F00B2]'
@@ -160,14 +187,33 @@ function NavGroup({ items, pathname }: { items: typeof mainNav; pathname: string
   );
 }
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+/* ---------- Layout ---------- */
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, tenant, logout } = useAuth();
+  const isMobile = useIsMobile();
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  /* Inicializar estado según dispositivo y preferencia guardada */
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    } else {
+      const saved = localStorage.getItem('koda_sidebar_open');
+      setSidebarOpen(saved === null ? true : saved === 'true');
+    }
+  }, [isMobile]);
+
+  const toggleSidebar = () => {
+    const next = !sidebarOpen;
+    setSidebarOpen(next);
+    if (!isMobile) {
+      localStorage.setItem('koda_sidebar_open', String(next));
+    }
+  };
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('koda_token') : null;
@@ -188,9 +234,31 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen flex bg-[#F8F7FA]">
-      {/* Sidebar flotante tipo cápsula / cilindro */}
-      <aside className="fixed left-4 top-4 bottom-4 w-16 bg-white rounded-[32px] shadow-[0_4px_24px_rgba(0,0,0,0.06)] z-50 flex flex-col items-center py-5">
+    <div className="min-h-screen bg-[#F8F7FA]">
+      {/* Overlay oscuro en móvil cuando el sidebar está abierto */}
+      {isMobile && sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/20 z-40 backdrop-blur-sm transition-opacity"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar flotante tipo cápsula */}
+      <aside
+        className={`
+          fixed z-50 flex flex-col items-center py-5 w-16 bg-white rounded-[32px]
+          shadow-[0_4px_24px_rgba(0,0,0,0.06)]
+          transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
+          ${isMobile
+            ? sidebarOpen
+              ? 'left-4 top-4 bottom-4 translate-x-0 opacity-100'
+              : '-left-4 top-4 bottom-4 -translate-x-full opacity-0 pointer-events-none'
+            : sidebarOpen
+              ? 'left-4 top-4 bottom-4 translate-x-0 opacity-100'
+              : 'left-4 top-4 bottom-4 -translate-x-24 opacity-0 pointer-events-none'
+          }
+        `}
+      >
         {/* Logo */}
         <Link href="/" className="mb-6">
           <div className="w-8 h-8 rounded-full bg-[#7F00B2] flex items-center justify-center text-white font-bold text-sm">
@@ -198,20 +266,16 @@ export default function DashboardLayout({
           </div>
         </Link>
 
-        {/* Navegación principal */}
+        {/* Navegación */}
         <nav className="flex-1 flex flex-col items-center gap-3 w-full px-2 overflow-y-auto no-scrollbar">
-          <NavGroup items={mainNav} pathname={pathname} />
-
+          <NavGroup items={mainNav} pathname={pathname} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
           <div className="w-6 h-px bg-slate-100 my-1" />
-
-          <NavGroup items={managementNav} pathname={pathname} />
-
+          <NavGroup items={managementNav} pathname={pathname} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
           <div className="w-6 h-px bg-slate-100 my-1" />
-
-          <NavGroup items={systemNav} pathname={pathname} />
+          <NavGroup items={systemNav} pathname={pathname} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
         </nav>
 
-        {/* Cerrar sesión */}
+        {/* Logout */}
         <div className="mt-3 pt-3 w-full flex justify-center">
           <button
             onClick={logout}
@@ -223,10 +287,56 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Main content — margen para dejar espacio al sidebar flotante */}
-      <main className="flex-1 ml-[88px] p-8 min-h-screen">
-        {children}
-      </main>
+      {/* Contenido principal */}
+      <div
+        className={`
+          transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
+          ${sidebarOpen && !isMobile ? 'ml-[88px]' : 'ml-0'}
+        `}
+      >
+        {/* Header */}
+        <header className="flex items-center justify-between px-6 py-4 lg:px-8 lg:py-5">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleSidebar}
+              className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 hover:text-[#7F00B2] hover:border-[#E9D5FF] transition-colors"
+              title={sidebarOpen ? 'Ocultar menú' : 'Mostrar menú'}
+            >
+              {sidebarOpen ? <CloseIcon /> : <MenuIcon />}
+            </button>
+            <div className="hidden sm:block">
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">KODA POS</p>
+              <p className="text-xs text-slate-500">{tenant?.name || 'Mi Negocio'}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Notificaciones */}
+            <button className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#7F00B2] transition-colors relative">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+
+            {/* Avatar */}
+            <div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#7F00B2] to-[#BC4ED8] flex items-center justify-center text-white text-xs font-bold">
+                {user.firstName?.[0]?.toUpperCase() || 'U'}
+              </div>
+              <div className="hidden md:block">
+                <p className="text-sm font-medium text-[#1B004B]">{user.firstName} {user.lastName}</p>
+                <p className="text-[10px] text-slate-400 capitalize">{user.role?.toLowerCase()}</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Main */}
+        <main className="px-6 pb-8 lg:px-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
