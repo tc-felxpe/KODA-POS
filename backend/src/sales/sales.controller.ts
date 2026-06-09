@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param, UseGuards, Request } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { TenantId } from '../common/decorators/tenant.decorator';
@@ -26,5 +26,15 @@ export class SalesController {
   @Get('payment-methods')
   getPaymentMethods(@TenantId() tenantId: string) {
     return this.salesService.getPaymentMethods(tenantId);
+  }
+
+  @Post(':id/returns')
+  createReturn(
+    @Param('id') saleId: string,
+    @Body() body: { items: { productId: string; quantity: number; unitPrice: number }[]; reason?: string },
+    @TenantId() tenantId: string,
+    @Request() req: any,
+  ) {
+    return this.salesService.createReturn(tenantId, saleId, req.user.userId, body.items, body.reason);
   }
 }

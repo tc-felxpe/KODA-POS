@@ -112,6 +112,69 @@ export class SalesService {
     return methods;
   }
 
+  async createReturn(
+    tenantId: string,
+    saleId: string,
+    userId: string,
+    items: { productId: string; quantity: number; unitPrice: number }[],
+    reason?: string,
+  ) {
+    const sale = await this.prisma.sale.findFirst({
+      where: { id: saleId, tenantId },
+      include: { details: true },
+    });
+    if (!sale) throw new Error('Venta no encontrada');
+
+    const totalReturned = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+
+    /* Crear la devolución */
+    const returnRecord = await this.prisma.saleReturn.create({
+      data: {
+        tenantId,
+        saleId,
+        customerId: sale.customerId,
+        totalReturned,
+        reason: reason || null,
+        processedById: userId,
+        details: {
+          create: items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          })),
+        },
+      },
+      include: { details: true },
+    });
+
+    /* Regresar inventario */
+    for (const item of items) {
+      const inventory = await this.prisma.inventory.findFirst({
+        where: { productId: item.productId, tenantId },
+      });
+      if (inventory) {
+        await this.prisma.inventory.update({
+          where: { id: inventory.id },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
+    }
+
+    /* Registrar auditoría */
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId,
+        action: 'SALE_RETURN',
+        entity: 'Sale',
+        entityId: saleId,
+        newValues: { totalReturned, reason, items },
+      },
+    });
+
+    return returnRecord;
+  }
+
   private async generateSaleNumber(tenantId: string): Promise<string> {
     const count = await this.prisma.sale.count({ where: { tenantId } });
     return `VEN-${String(count + 1).padStart(6, '0')}`;

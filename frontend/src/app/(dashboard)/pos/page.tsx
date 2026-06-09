@@ -6,6 +6,7 @@ import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import PaymentModal from '@/components/PaymentModal';
+import ReturnModal from '@/components/ReturnModal';
 
 /* ---------- Tipos ---------- */
 interface Product {
@@ -101,6 +102,7 @@ export default function POSPage() {
   const [customerSearch, setCustomerSearch] = useState('');
   const [creatingClient, setCreatingClient] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
+  const [showReturn, setShowReturn] = useState(false);
   const [saleSuccess, setSaleSuccess] = useState(false);
   const [allowNegativeStock, setAllowNegativeStock] = useState(false);
   const [stockError, setStockError] = useState('');
@@ -526,6 +528,12 @@ export default function POSPage() {
 
         {/* Acciones del carrito */}
         <div className="mt-2 pt-3 border-t border-slate-100 flex gap-2">
+          <button
+            onClick={() => setShowReturn(true)}
+            className="flex-1 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-xs font-medium hover:bg-orange-100 transition-colors"
+          >
+            Devolver
+          </button>
           <button
             onClick={() => setShowPromotions(true)}
             disabled={cart.items.length === 0}
@@ -983,6 +991,18 @@ export default function POSPage() {
           total={total}
           onConfirm={handleFinishSale}
           onClose={() => setShowPayment(false)}
+        />
+      )}
+
+      {/* ========== MODAL DEVOLUCIÓN ========== */}
+      {showReturn && (
+        <ReturnModal
+          onClose={() => setShowReturn(false)}
+          onSuccess={() => {
+            setSaleSuccess(true);
+            setTimeout(() => setSaleSuccess(false), 3000);
+            fetchProducts('');
+          }}
         />
       )}
 
