@@ -5,6 +5,7 @@ import api from '@/lib/axios';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
 import BarcodeScanner from '@/components/BarcodeScanner';
+import PaymentModal from '@/components/PaymentModal';
 
 /* ---------- Tipos ---------- */
 interface Product {
@@ -98,6 +99,8 @@ export default function POSPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
   const [creatingClient, setCreatingClient] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [saleSuccess, setSaleSuccess] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   /* Escáner USB/Bluetooth: captura cualquier input cuando el search tiene focus */
@@ -131,6 +134,39 @@ export default function POSPage() {
       setCustomers([]);
     }
   }, []);
+
+  /* Finalizar venta */
+  const handleFinishSale = async (payments: any[]) => {
+    try {
+      await api.post('/sales', {
+        customerId: cart.client?.id,
+        items: cart.items.map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          unitPrice: i.salePrice,
+          discount: i.discountType === 'percent' ? (i.salePrice * i.quantity * i.discount) / 100 : i.discount * i.quantity,
+          tax: ((i.salePrice * i.quantity - (i.discountType === 'percent' ? (i.salePrice * i.quantity * i.discount) / 100 : i.discount * i.quantity)) * i.tax) / 100,
+        })),
+        payments: payments.map((p) => ({
+          paymentMethodId: p.paymentMethodId,
+          amount: p.amount,
+          reference: p.reference,
+        })),
+        subtotal: cart.getSubtotal(),
+        discount: cart.getTotalDiscount() + cart.getGlobalDiscount(),
+        tax: cart.getTotalTax(),
+        total: cart.getTotal(),
+        notes: cart.observations,
+      });
+      cart.clearCart();
+      setShowPayment(false);
+      setSaleSuccess(true);
+      setTimeout(() => setSaleSuccess(false), 3000);
+      fetchProducts('');
+    } catch (err) {
+      alert('Error al registrar la venta');
+    }
+  };
 
   useEffect(() => {
     fetchCustomers('');
@@ -652,6 +688,7 @@ export default function POSPage() {
               <span>${total.toLocaleString()}</span>
             </div>
             <button
+              onClick={() => { setShowCartMobile(false); setShowPayment(true); }}
               disabled={cart.items.length === 0}
               className="w-full py-4 mt-2 bg-[#7F00B2] text-white rounded-full font-medium disabled:opacity-40"
             >
@@ -878,6 +915,25 @@ export default function POSPage() {
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* ========== MODAL PAGO ========== */}
+      {showPayment && (
+        <PaymentModal
+          total={total}
+          onConfirm={handleFinishSale}
+          onClose={() => setShowPayment(false)}
+        />
+      )}
+
+      {/* ========== TOAST ÉXITO ========== */}
+      {saleSuccess && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[70] bg-green-500 text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-2 animate-bounce">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span className="text-sm font-medium">Venta registrada exitosamente</span>
         </div>
       )}
 

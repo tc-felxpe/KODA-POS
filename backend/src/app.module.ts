@@ -10,6 +10,7 @@ import { TenantsModule } from './tenants/tenants.module';
 import { ProductsModule } from './products/products.module';
 import { CustomersModule } from './customers/customers.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
+import { SalesModule } from './sales/sales.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
@@ -24,6 +25,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     ProductsModule,
     CustomersModule,
     SuppliersModule,
+    SalesModule,
   ],
   controllers: [AppController],
   providers: [
