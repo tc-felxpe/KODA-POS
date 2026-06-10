@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
-import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
+import { CreateAdjustmentDto, CreateTransferDto } from './dto/create-adjustment.dto';
 import { MovementFilterDto } from './dto/movement-filter.dto';
 import { TenantId } from '../common/decorators/tenant.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -33,5 +33,14 @@ export class InventoryController {
     @Request() req: any,
   ) {
     return this.inventoryService.createAdjustment(tenantId, req.user.userId, dto);
+  }
+
+  @Post('transfer')
+  createTransfer(
+    @Body() dto: CreateTransferDto,
+    @TenantId() tenantId: string,
+    @Request() req: any,
+  ) {
+    return this.inventoryService.transfer(tenantId, req.user.userId, dto);
   }
 }

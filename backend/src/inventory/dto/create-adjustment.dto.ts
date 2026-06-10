@@ -31,3 +31,25 @@ export class CreateAdjustmentDto {
   @IsOptional()
   referenceId?: string;
 }
+
+export class CreateTransferDto {
+  @IsString()
+  productId: string;
+
+  @IsString()
+  @IsOptional()
+  variantId?: string;
+
+  @IsString()
+  fromBranchId: string;
+
+  @IsString()
+  toBranchId: string;
+
+  @IsNumber()
+  quantity: number;
+
+  @IsString()
+  @IsOptional()
+  reason?: string;
+}

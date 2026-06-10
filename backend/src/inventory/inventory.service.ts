@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
+import { CreateAdjustmentDto, CreateTransferDto } from './dto/create-adjustment.dto';
 import { MovementFilterDto } from './dto/movement-filter.dto';
 
 @Injectable()
@@ -126,5 +126,91 @@ export class InventoryService {
     });
 
     return { movement, inventory };
+  }
+
+  async transfer(tenantId: string, userId: string, data: CreateTransferDto) {
+    const { productId, variantId, fromBranchId, toBranchId, quantity, reason } = data;
+
+    if (fromBranchId === toBranchId) {
+      throw new BadRequestException('La bodega origen y destino deben ser diferentes');
+    }
+
+    if (quantity <= 0) {
+      throw new BadRequestException('La cantidad debe ser mayor a cero');
+    }
+
+    // Buscar inventario en origen
+    const fromInventory = await this.prisma.inventory.findFirst({
+      where: { tenantId, productId, variantId: variantId || null, branchId: fromBranchId },
+    });
+
+    const fromStock = fromInventory ? Number(fromInventory.stock) : 0;
+    if (fromStock < quantity) {
+      throw new BadRequestException(`Stock insuficiente en bodega origen (disponible: ${fromStock})`);
+    }
+
+    const referenceId = `TRF-${Date.now()}`;
+
+    // Actualizar stock en origen (salida)
+    if (fromInventory) {
+      await this.prisma.inventory.update({
+        where: { id: fromInventory.id },
+        data: { stock: fromStock - quantity },
+      });
+    }
+
+    await this.prisma.inventoryMovement.create({
+      data: {
+        tenantId,
+        productId,
+        type: 'EXIT',
+        quantity,
+        stockBefore: fromStock,
+        stockAfter: fromStock - quantity,
+        reason: reason || `Transferencia a bodega ${toBranchId}`,
+        referenceId,
+        userId,
+      },
+    });
+
+    // Buscar/crear inventario en destino (entrada)
+    const toInventory = await this.prisma.inventory.findFirst({
+      where: { tenantId, productId, variantId: variantId || null, branchId: toBranchId },
+    });
+
+    const toStock = toInventory ? Number(toInventory.stock) : 0;
+
+    if (toInventory) {
+      await this.prisma.inventory.update({
+        where: { id: toInventory.id },
+        data: { stock: toStock + quantity },
+      });
+    } else {
+      await this.prisma.inventory.create({
+        data: {
+          tenantId,
+          productId,
+          variantId: variantId || null,
+          branchId: toBranchId,
+          stock: quantity,
+        },
+      });
+    }
+
+    await this.prisma.inventoryMovement.create({
+      data: {
+        tenantId,
+        productId,
+        type: 'ENTRY',
+        quantity,
+        stockBefore: toStock,
+        stockAfter: toStock + quantity,
+        reason: reason || `Transferencia desde bodega ${fromBranchId}`,
+        referenceId,
+        userId,
+      },
+    });
+
+    return { success: true, referenceId, quantity };
   }
 }

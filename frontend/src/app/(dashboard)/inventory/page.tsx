@@ -46,10 +46,18 @@ export default function InventoryPage() {
   const [filterStart, setFilterStart] = useState('');
   const [filterEnd, setFilterEnd] = useState('');
   const [showAdjustment, setShowAdjustment] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
   const [adjustmentForm, setAdjustmentForm] = useState({
     productId: '',
     branchId: '',
     type: 'ADJUSTMENT',
+    quantity: '',
+    reason: '',
+  });
+  const [transferForm, setTransferForm] = useState({
+    productId: '',
+    fromBranchId: '',
+    toBranchId: '',
     quantity: '',
     reason: '',
   });
@@ -100,6 +108,21 @@ export default function InventoryPage() {
     }
   };
 
+  const handleTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/inventory/transfer', {
+        ...transferForm,
+        quantity: parseFloat(transferForm.quantity),
+      });
+      setShowTransfer(false);
+      setTransferForm({ productId: '', fromBranchId: '', toBranchId: '', quantity: '', reason: '' });
+      fetchMovements();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Error al transferir');
+    }
+  };
+
   const productMap = new Map(products.map(p => [p.id, p]));
 
   return (
@@ -115,6 +138,12 @@ export default function InventoryPage() {
           className="px-4 py-2.5 bg-[#7F00B2] hover:bg-[#4C007D] text-white font-medium rounded-xl transition-colors text-sm"
         >
           + Ajuste de inventario
+        </button>
+        <button
+          onClick={() => setShowTransfer(true)}
+          className="px-4 py-2.5 bg-white border border-slate-200 hover:border-[#BC4ED8] text-slate-700 font-medium rounded-xl transition-colors text-sm"
+        >
+          ↔️ Transferencia
         </button>
       </div>
 
@@ -201,9 +230,16 @@ export default function InventoryPage() {
                       {product?.sku && <p className="text-xs text-slate-400">{product.sku}</p>}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${typeInfo.color}`}>
-                        {typeInfo.label}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${typeInfo.color}`}>
+                          {typeInfo.label}
+                        </span>
+                        {m.referenceId?.startsWith('TRF-') && (
+                          <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded" title={`Ref: ${m.referenceId}`}>
+                            ↔️
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right font-medium">
                       {m.type === 'EXIT' || m.type === 'SALE' ? '-' : '+'}{Number(m.quantity)}
@@ -313,6 +349,88 @@ export default function InventoryPage() {
                   Registrar ajuste
                 </button>
                 <button type="button" onClick={() => setShowAdjustment(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de transferencia */}
+      {showTransfer && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md">
+            <h2 className="text-lg font-bold text-[#1B004B] mb-4">Transferencia entre bodegas</h2>
+            <form onSubmit={handleTransfer} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Producto *</label>
+                <select
+                  value={transferForm.productId}
+                  onChange={(e) => setTransferForm({...transferForm, productId: e.target.value})}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]"
+                  required
+                >
+                  <option value="">Seleccionar producto</option>
+                  {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Origen *</label>
+                  <select
+                    value={transferForm.fromBranchId}
+                    onChange={(e) => setTransferForm({...transferForm, fromBranchId: e.target.value})}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]"
+                    required
+                  >
+                    <option value="">Bodega</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Destino *</label>
+                  <select
+                    value={transferForm.toBranchId}
+                    onChange={(e) => setTransferForm({...transferForm, toBranchId: e.target.value})}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]"
+                    required
+                  >
+                    <option value="">Bodega</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Cantidad *</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={transferForm.quantity}
+                  onChange={(e) => setTransferForm({...transferForm, quantity: e.target.value})}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Motivo (opcional)</label>
+                <input
+                  value={transferForm.reason}
+                  onChange={(e) => setTransferForm({...transferForm, reason: e.target.value})}
+                  placeholder="Ej: Reabastecimiento de mostrador"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="submit" className="flex-1 py-2.5 bg-[#7F00B2] hover:bg-[#4C007D] text-white rounded-xl text-sm font-medium">
+                  Transferir
+                </button>
+                <button type="button" onClick={() => setShowTransfer(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium">
                   Cancelar
                 </button>
               </div>
