@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import PaymentModal from '@/components/PaymentModal';
 import ReturnModal from '@/components/ReturnModal';
+import CancelModal from '@/components/CancelModal';
 
 /* ---------- Tipos ---------- */
 interface Product {
@@ -103,6 +104,7 @@ export default function POSPage() {
   const [creatingClient, setCreatingClient] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showReturn, setShowReturn] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
   const [saleSuccess, setSaleSuccess] = useState(false);
   const [allowNegativeStock, setAllowNegativeStock] = useState(false);
   const [stockError, setStockError] = useState('');
@@ -533,6 +535,12 @@ export default function POSPage() {
             className="flex-1 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-xs font-medium hover:bg-orange-100 transition-colors"
           >
             Devolver
+          </button>
+          <button
+            onClick={() => setShowCancel(true)}
+            className="flex-1 py-2.5 bg-red-50 text-red-600 rounded-xl text-xs font-medium hover:bg-red-100 transition-colors"
+          >
+            Anular
           </button>
           <button
             onClick={() => setShowPromotions(true)}
@@ -1002,6 +1010,17 @@ export default function POSPage() {
             setSaleSuccess(true);
             setTimeout(() => setSaleSuccess(false), 3000);
             fetchProducts('');
+          }}
+        />
+      )}
+
+      {/* ========== MODAL ANULACIÓN ========== */}
+      {showCancel && (
+        <CancelModal
+          onClose={() => setShowCancel(false)}
+          onSuccess={() => {
+            setSaleSuccess(true);
+            setTimeout(() => setSaleSuccess(false), 3000);
           }}
         />
       )}

@@ -175,6 +175,48 @@ export class SalesService {
     return returnRecord;
   }
 
+  async cancelSale(tenantId: string, saleId: string, userId: string, reason?: string) {
+    const sale = await this.prisma.sale.findFirst({
+      where: { id: saleId, tenantId },
+      include: { details: true },
+    });
+    if (!sale) throw new Error('Venta no encontrada');
+    if (sale.status === 'CANCELLED') throw new Error('La venta ya está anulada');
+
+    /* Anular venta */
+    await this.prisma.sale.update({
+      where: { id: saleId },
+      data: { status: 'CANCELLED', notes: reason ? `ANULADA: ${reason}` : 'ANULADA' },
+    });
+
+    /* Regresar inventario */
+    for (const detail of sale.details) {
+      const inventory = await this.prisma.inventory.findFirst({
+        where: { productId: detail.productId, tenantId },
+      });
+      if (inventory) {
+        await this.prisma.inventory.update({
+          where: { id: inventory.id },
+          data: { stock: { increment: Number(detail.quantity) } },
+        });
+      }
+    }
+
+    /* Registrar auditoría */
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId,
+        action: 'SALE_CANCEL',
+        entity: 'Sale',
+        entityId: saleId,
+        newValues: { reason, cancelledAt: new Date().toISOString() },
+      },
+    });
+
+    return { success: true };
+  }
+
   private async generateSaleNumber(tenantId: string): Promise<string> {
     const count = await this.prisma.sale.count({ where: { tenantId } });
     return `VEN-${String(count + 1).padStart(6, '0')}`;

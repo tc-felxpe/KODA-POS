@@ -37,4 +37,18 @@ export class SalesController {
   ) {
     return this.salesService.createReturn(tenantId, saleId, req.user.userId, body.items, body.reason);
   }
+
+  @Post(':id/cancel')
+  cancelSale(
+    @Param('id') saleId: string,
+    @Body() body: { reason?: string },
+    @TenantId() tenantId: string,
+    @Request() req: any,
+  ) {
+    /* Solo ADMIN y SUPERVISOR pueden anular */
+    if (!['ADMIN', 'SUPERVISOR'].includes(req.user.role)) {
+      return { error: 'No tienes permisos para anular ventas' };
+    }
+    return this.salesService.cancelSale(tenantId, saleId, req.user.userId, body.reason);
+  }
 }
