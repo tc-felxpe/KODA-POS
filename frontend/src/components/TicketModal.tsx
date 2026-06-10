@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface TicketItem {
   name: string;
@@ -78,18 +80,76 @@ export default function TicketModal({
     window.print();
   };
 
+  const handleDownloadPDF = async () => {
+    const element = document.getElementById('ticket-print');
+    if (!element) return;
+    const canvas = await html2canvas(element);
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({
+      unit: 'mm',
+      format: [80, (canvas.height * 80) / canvas.width],
+    });
+    pdf.addImage(imgData, 'PNG', 0, 0, 80, (canvas.height * 80) / canvas.width);
+    pdf.save(`${saleNumber}.pdf`);
+  };
+
+  const handleWhatsApp = () => {
+    const text = `*${businessName}*%0A%0A` +
+      `*Factura:* ${saleNumber}%0A` +
+      `*Fecha:* ${new Date(date).toLocaleString('es-CO')}%0A` +
+      `*Total:* $${total.toLocaleString()}%0A%0A` +
+      `*Productos:*%0A` +
+      items.map((i) => `- ${i.name} x${i.quantity} = $${i.total.toLocaleString()}`).join('%0A');
+    window.open(`https://wa.me/?text=${text}`, '_blank');
+  };
+
+  const handleEmail = () => {
+    const subject = encodeURIComponent(`Ticket ${saleNumber} — ${businessName}`);
+    const body = encodeURIComponent(
+      `Factura: ${saleNumber}\n` +
+      `Fecha: ${new Date(date).toLocaleString('es-CO')}\n` +
+      `Total: $${total.toLocaleString()}\n\n` +
+      `Productos:\n` +
+      items.map((i) => `- ${i.name} x${i.quantity} = $${i.total.toLocaleString()}`).join('\n')
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
+
   return (
     <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl max-h-[90vh] flex flex-col w-full max-w-sm">
         <div className="flex items-center justify-between p-4 border-b border-slate-100">
           <h3 className="text-lg font-semibold text-[#1B004B]">Ticket de venta</h3>
           <div className="flex gap-2">
-            <button
-              onClick={handlePrint}
-              className="px-3 py-1.5 bg-[#7F00B2] text-white rounded-lg text-xs font-medium hover:bg-[#4C007D] transition-colors"
-            >
-              🖨️ Imprimir
-            </button>
+            <div className="flex gap-1.5">
+              <button
+                onClick={handleDownloadPDF}
+                className="px-2 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-200 transition-colors"
+                title="Descargar PDF"
+              >
+                📄 PDF
+              </button>
+              <button
+                onClick={handleWhatsApp}
+                className="px-2 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-medium hover:bg-green-200 transition-colors"
+                title="Compartir por WhatsApp"
+              >
+                💬 WA
+              </button>
+              <button
+                onClick={handleEmail}
+                className="px-2 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-200 transition-colors"
+                title="Enviar por correo"
+              >
+                ✉️ Email
+              </button>
+              <button
+                onClick={handlePrint}
+                className="px-3 py-1.5 bg-[#7F00B2] text-white rounded-lg text-xs font-medium hover:bg-[#4C007D] transition-colors"
+              >
+                🖨️ Imprimir
+              </button>
+            </div>
             <button
               onClick={onClose}
               className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
