@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsUUID, IsArray } from 'class-validator';
 
 export class CreateProductDto {
   @IsString()
@@ -75,4 +75,8 @@ export class CreateProductDto {
   @IsUUID()
   @IsOptional()
   branchId?: string;
+
+  @IsArray()
+  @IsOptional()
+  variants?: any[];
 }
