@@ -8,6 +8,7 @@ import BarcodeScanner from '@/components/BarcodeScanner';
 import PaymentModal from '@/components/PaymentModal';
 import ReturnModal from '@/components/ReturnModal';
 import CancelModal from '@/components/CancelModal';
+import TicketModal from '@/components/TicketModal';
 
 /* ---------- Tipos ---------- */
 interface Product {
@@ -105,6 +106,8 @@ export default function POSPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [showReturn, setShowReturn] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
+  const [showTicket, setShowTicket] = useState(false);
+  const [lastTicket, setLastTicket] = useState<any>(null);
   const [saleSuccess, setSaleSuccess] = useState(false);
   const [allowNegativeStock, setAllowNegativeStock] = useState(false);
   const [stockError, setStockError] = useState('');
@@ -145,7 +148,7 @@ export default function POSPage() {
   /* Finalizar venta */
   const handleFinishSale = async (payments: any[]) => {
     try {
-      await api.post('/sales', {
+      const res = await api.post('/sales', {
         customerId: cart.client?.id,
         items: cart.items.map((i) => ({
           productId: i.productId,
@@ -167,6 +170,31 @@ export default function POSPage() {
       });
       cart.clearCart();
       setShowPayment(false);
+
+      /* Preparar ticket */
+      const saleData = res.data;
+      setLastTicket({
+        saleNumber: saleData.saleNumber,
+        date: saleData.createdAt,
+        businessName: tenant?.name || 'Mi Negocio',
+        cashier: user ? `${user.firstName} ${user.lastName}` : 'Cajero',
+        customer: cart.client ? `${cart.client.firstName} ${cart.client.lastName}` : undefined,
+        items: saleData.details.map((d: any) => ({
+          name: d.product?.name || 'Producto',
+          quantity: Number(d.quantity),
+          unitPrice: Number(d.unitPrice),
+          total: Number(d.subtotal),
+        })),
+        subtotal: Number(saleData.subtotal),
+        discount: Number(saleData.discount),
+        tax: Number(saleData.tax),
+        total: Number(saleData.total),
+        payments: saleData.payments.map((p: any) => ({
+          method: p.paymentMethod?.name || 'Pago',
+          amount: Number(p.amount),
+        })),
+      });
+      setShowTicket(true);
       setSaleSuccess(true);
       setTimeout(() => setSaleSuccess(false), 3000);
       fetchProducts('');
@@ -542,6 +570,14 @@ export default function POSPage() {
           >
             Anular
           </button>
+          {lastTicket && (
+            <button
+              onClick={() => setShowTicket(true)}
+              className="flex-1 py-2.5 bg-[#F3E8FF] text-[#7F00B2] rounded-xl text-xs font-medium hover:bg-[#E9D5FF] transition-colors"
+            >
+              🖨️ Reimprimir
+            </button>
+          )}
           <button
             onClick={() => setShowPromotions(true)}
             disabled={cart.items.length === 0}
@@ -1022,6 +1058,14 @@ export default function POSPage() {
             setSaleSuccess(true);
             setTimeout(() => setSaleSuccess(false), 3000);
           }}
+        />
+      )}
+
+      {/* ========== MODAL TICKET ========== */}
+      {showTicket && lastTicket && (
+        <TicketModal
+          {...lastTicket}
+          onClose={() => setShowTicket(false)}
         />
       )}
 
