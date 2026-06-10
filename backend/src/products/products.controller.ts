@@ -17,6 +17,11 @@ export class ProductsController {
     return this.productsService.create(tenantId, dto);
   }
 
+  @Post('import')
+  importProducts(@Body() data: { products: any[] }, @TenantId() tenantId: string) {
+    return this.productsService.importProducts(tenantId, data.products);
+  }
+
   @Get()
   findAll(@TenantId() tenantId: string, @Query('search') search?: string) {
     return this.productsService.findAll(tenantId, search);

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import api from '@/lib/axios';
 import Link from 'next/link';
 import LabelPrintModal from '@/components/LabelPrintModal';
+import ProductImportModal from '@/components/ProductImportModal';
 
 interface Category { id: string; name: string; }
 interface Brand { id: string; name: string; }
@@ -69,6 +70,7 @@ export default function ProductsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [labelProduct, setLabelProduct] = useState<Product | null>(null);
+  const [showImport, setShowImport] = useState(false);
   const [form, setForm] = useState({
     name: '', sku: '', barcode: '', description: '',
     salePrice: '', costPrice: '', minStock: '', maxStock: '',
@@ -325,6 +327,34 @@ export default function ProductsPage() {
         >
           + Nuevo producto
         </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowImport(true)}
+            className="px-4 py-2.5 bg-white border border-slate-200 hover:border-[#BC4ED8] text-slate-700 font-medium rounded-xl transition-colors text-sm"
+          >
+            📥 Importar
+          </button>
+          <button
+            onClick={() => {
+              const headers = ['name','sku','barcode','salePrice','costPrice','minStock','unit','tax','initialStock','description','active'];
+              const rows = products.map(p => [
+                p.name, p.sku || '', p.barcode || '', p.salePrice, p.costPrice, p.minStock,
+                p.unit || 'UNIDAD', p.tax || '', p.inventory?.[0]?.stock || 0, p.description || '', p.active ? '1' : '0'
+              ].join(','));
+              const csv = [headers.join(','), ...rows].join('\n');
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `productos_${new Date().toISOString().slice(0,10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="px-4 py-2.5 bg-white border border-slate-200 hover:border-[#BC4ED8] text-slate-700 font-medium rounded-xl transition-colors text-sm"
+          >
+            📤 Exportar
+          </button>
+        </div>
       </div>
 
       {/* Navegación secundaria */}
@@ -776,6 +806,14 @@ export default function ProductsPage() {
         <LabelPrintModal
           product={labelProduct}
           onClose={() => setLabelProduct(null)}
+        />
+      )}
+
+      {/* Modal de importación */}
+      {showImport && (
+        <ProductImportModal
+          onClose={() => setShowImport(false)}
+          onSuccess={() => fetchProducts()}
         />
       )}
     </div>

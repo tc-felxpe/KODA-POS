@@ -160,6 +160,48 @@ export class ProductsService {
     });
   }
 
+  async importProducts(tenantId: string, products: any[]) {
+    const results = { created: 0, errors: [] as string[] };
+
+    for (let i = 0; i < products.length; i++) {
+      const p = products[i];
+      try {
+        const data: any = {
+          name: p.name,
+          sku: p.sku || undefined,
+          barcode: p.barcode || undefined,
+          description: p.description || undefined,
+          salePrice: p.salePrice ? parseFloat(p.salePrice) : 0,
+          costPrice: p.costPrice ? parseFloat(p.costPrice) : 0,
+          minStock: p.minStock ? parseFloat(p.minStock) : 0,
+          unit: p.unit || 'UNIDAD',
+          tax: p.tax ? parseFloat(p.tax) : undefined,
+          active: true,
+        };
+
+        if (p.barcode) {
+          const exists = await this.prisma.product.findFirst({
+            where: { tenantId, barcode: p.barcode },
+          });
+          if (exists) {
+            results.errors.push(`Fila ${i + 1}: barcode ${p.barcode} ya existe`);
+            continue;
+          }
+        }
+
+        await this.create(tenantId, {
+          ...data,
+          initialStock: p.initialStock ? parseFloat(p.initialStock) : 0,
+        });
+        results.created++;
+      } catch (err: any) {
+        results.errors.push(`Fila ${i + 1}: ${err.message}`);
+      }
+    }
+
+    return results;
+  }
+
   async findAll(tenantId: string, search?: string) {
     return this.prisma.product.findMany({
       where: {
