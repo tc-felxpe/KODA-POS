@@ -22,6 +22,13 @@ export class ProductsController {
     return this.productsService.findAll(tenantId, search);
   }
 
+  // ─── CÓDIGOS DE BARRAS (debe ir ANTES de :id) ───
+
+  @Get('barcode/generate')
+  generateBarcode(@TenantId() tenantId: string) {
+    return this.productsService.generateBarcode(tenantId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @TenantId() tenantId: string) {
     return this.productsService.findOne(id, tenantId);

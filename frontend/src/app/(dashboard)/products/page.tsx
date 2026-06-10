@@ -345,7 +345,21 @@ export default function ProductsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Código de barras</label>
-                  <input value={form.barcode} onChange={(e) => setForm({...form, barcode: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+                  <div className="flex gap-2">
+                    <input value={form.barcode} onChange={(e) => setForm({...form, barcode: e.target.value})} className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await api.get('/products/barcode/generate');
+                          setForm({...form, barcode: res.data});
+                        } catch (err) { alert('Error al generar código'); }
+                      }}
+                      className="px-3 py-2.5 bg-[#F3E8FF] text-[#7F00B2] rounded-xl text-xs font-medium hover:bg-[#E9D5FF] whitespace-nowrap"
+                    >
+                      Generar
+                    </button>
+                  </div>
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
@@ -515,6 +529,7 @@ export default function ProductsPage() {
                           <tr className="text-slate-500">
                             <th className="text-left py-2 px-2">Variante</th>
                             <th className="text-left py-2 px-2">SKU</th>
+                            <th className="text-left py-2 px-2">Barcode</th>
                             <th className="text-left py-2 px-2">Precio venta</th>
                             <th className="text-left py-2 px-2">Stock inicial</th>
                             <th className="text-left py-2 px-2"></th>
@@ -536,6 +551,27 @@ export default function ProductsPage() {
                                   onChange={(e) => updateVariant(idx, 'sku', e.target.value)}
                                   className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-[#BC4ED8]"
                                 />
+                              </td>
+                              <td className="py-2 px-2">
+                                <div className="flex gap-1">
+                                  <input
+                                    value={v.barcode || ''}
+                                    onChange={(e) => updateVariant(idx, 'barcode', e.target.value)}
+                                    className="w-20 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-[#BC4ED8]"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        const res = await api.get('/products/barcode/generate');
+                                        updateVariant(idx, 'barcode', res.data);
+                                      } catch (err) { alert('Error al generar código'); }
+                                    }}
+                                    className="px-1.5 py-1 bg-[#F3E8FF] text-[#7F00B2] rounded-lg text-[10px] font-medium hover:bg-[#E9D5FF]"
+                                  >
+                                    ⚡
+                                  </button>
+                                </div>
                               </td>
                               <td className="py-2 px-2">
                                 <input
@@ -643,6 +679,7 @@ export default function ProductsPage() {
               <th className="px-6 py-3.5 font-semibold text-slate-600">SKU</th>
               <th className="px-6 py-3.5 font-semibold text-slate-600">Precio</th>
               <th className="px-6 py-3.5 font-semibold text-slate-600">Stock</th>
+              <th className="px-6 py-3.5 font-semibold text-slate-600">Barcode</th>
               <th className="px-6 py-3.5 font-semibold text-slate-600">Variantes</th>
               <th className="px-6 py-3.5 font-semibold text-slate-600">Estado</th>
               <th className="px-6 py-3.5 font-semibold text-slate-600 text-right">Acciones</th>
@@ -667,6 +704,7 @@ export default function ProductsPage() {
                     {Number(product.inventory?.[0]?.stock || 0)}
                   </span>
                 </td>
+                <td className="px-6 py-4 text-slate-500 text-xs">{product.barcode || '-'}</td>
                 <td className="px-6 py-4">
                   {product.variants && product.variants.length > 0 ? (
                     <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-[#F3E8FF] text-[#7F00B2]">

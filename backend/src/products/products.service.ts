@@ -1,13 +1,57 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { generateEAN13, generateNextBarcodeSequence } from '../common/utils/barcode.utils';
 
 @Injectable()
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
+  private async ensureBarcodeUnique(tenantId: string, barcode: string, excludeProductId?: string, excludeVariantId?: string) {
+    if (!barcode) return;
+    const [existingProduct, existingVariant] = await Promise.all([
+      this.prisma.product.findFirst({
+        where: { tenantId, barcode, NOT: excludeProductId ? { id: excludeProductId } : undefined },
+      }),
+      this.prisma.productVariant.findFirst({
+        where: { tenantId, barcode, NOT: excludeVariantId ? { id: excludeVariantId } : undefined },
+      }),
+    ]);
+    if (existingProduct || existingVariant) {
+      throw new ConflictException(`El código de barras ${barcode} ya está en uso`);
+    }
+  }
+
+  async generateBarcode(tenantId: string): Promise<string> {
+    // Buscar el barcode numérico más alto del tenant
+    const products = await this.prisma.product.findMany({
+      where: { tenantId, barcode: { startsWith: '770200' } },
+      select: { barcode: true },
+      orderBy: { barcode: 'desc' },
+      take: 1,
+    });
+    const variants = await this.prisma.productVariant.findMany({
+      where: { tenantId, barcode: { startsWith: '770200' } },
+      select: { barcode: true },
+      orderBy: { barcode: 'desc' },
+      take: 1,
+    });
+
+    const allBarcodes = [...products.map(p => p.barcode), ...variants.map(v => v.barcode)]
+      .filter(Boolean)
+      .sort();
+
+    const lastBarcode = allBarcodes.length > 0 ? allBarcodes[allBarcodes.length - 1] : null;
+    const base12 = generateNextBarcodeSequence(lastBarcode);
+    return generateEAN13(base12);
+  }
+
   async create(tenantId: string, data: any) {
     try {
       const { initialStock, branchId, variants, ...productData } = data;
+
+      if (productData.barcode) {
+        await this.ensureBarcodeUnique(tenantId, productData.barcode);
+      }
 
       const product = await this.prisma.product.create({
         data: {
@@ -45,6 +89,9 @@ export class ProductsService {
       // Crear variantes si vienen en el payload
       if (variants && variants.length > 0) {
         for (const v of variants) {
+          if (v.barcode) {
+            await this.ensureBarcodeUnique(tenantId, v.barcode);
+          }
           const variant = await this.prisma.productVariant.create({
             data: {
               tenantId,
@@ -152,6 +199,10 @@ export class ProductsService {
 
     const { variants, ...productData } = data;
 
+    if (productData.barcode) {
+      await this.ensureBarcodeUnique(tenantId, productData.barcode, id);
+    }
+
     const updated = await this.prisma.product.update({
       where: { id },
       data: productData,
@@ -160,6 +211,9 @@ export class ProductsService {
     // Actualizar variantes inline si vienen
     if (variants && Array.isArray(variants)) {
       for (const v of variants) {
+        if (v.barcode) {
+          await this.ensureBarcodeUnique(tenantId, v.barcode, id, v.id);
+        }
         if (v.id) {
           // Actualizar existente
           await this.prisma.productVariant.updateMany({
@@ -232,6 +286,10 @@ export class ProductsService {
 
     const { initialStock, branchId, ...variantData } = data;
 
+    if (variantData.barcode) {
+      await this.ensureBarcodeUnique(tenantId, variantData.barcode);
+    }
+
     const variant = await this.prisma.productVariant.create({
       data: {
         ...variantData,
@@ -279,6 +337,10 @@ export class ProductsService {
     if (!variant) throw new NotFoundException('Variante no encontrada');
 
     const { initialStock, branchId, ...variantData } = data;
+
+    if (variantData.barcode) {
+      await this.ensureBarcodeUnique(tenantId, variantData.barcode, undefined, variantId);
+    }
 
     const updated = await this.prisma.productVariant.update({
       where: { id: variantId },
