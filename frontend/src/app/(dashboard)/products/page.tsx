@@ -65,6 +65,7 @@ export default function ProductsPage() {
   const [businessConfig, setBusinessConfig] = useState<BusinessConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [labelProduct, setLabelProduct] = useState<Product | null>(null);
@@ -91,6 +92,15 @@ export default function ProductsPage() {
     finally { setLoading(false); }
   };
 
+  const fetchLowStock = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/products/low-stock');
+      setProducts(res.data);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  };
+
   const fetchOptions = async () => {
     try {
       const [catRes, brandRes, supRes, branchRes, configRes] = await Promise.all([
@@ -108,7 +118,13 @@ export default function ProductsPage() {
     } catch (err) { console.error(err); }
   };
 
-  useEffect(() => { fetchProducts(); }, [search]);
+  useEffect(() => {
+    if (showLowStockOnly) {
+      fetchLowStock();
+    } else {
+      fetchProducts();
+    }
+  }, [search, showLowStockOnly]);
   useEffect(() => { fetchOptions(); }, []);
 
   const resetForm = () => {
@@ -318,8 +334,8 @@ export default function ProductsPage() {
         <Link href="/brands" className="px-4 py-2 bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-medium whitespace-nowrap transition-colors">Marcas</Link>
       </div>
 
-      {/* Búsqueda */}
-      <div className="mb-6">
+      {/* Búsqueda y filtros */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <input
           type="text"
           value={search}
@@ -327,6 +343,17 @@ export default function ProductsPage() {
           placeholder="Buscar producto..."
           className="w-full max-w-md px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8] focus:ring-2 focus:ring-[#F3E8FF]"
         />
+        <button
+          type="button"
+          onClick={() => setShowLowStockOnly(!showLowStockOnly)}
+          className={`px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+            showLowStockOnly
+              ? 'bg-red-50 text-red-700 border-red-200'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-red-200'
+          }`}
+        >
+          ⚠️ Stock bajo
+        </button>
       </div>
 
       {/* Modal formulario */}
@@ -702,9 +729,14 @@ export default function ProductsPage() {
                 <td className="px-6 py-4 text-slate-500">{product.sku || '-'}</td>
                 <td className="px-6 py-4 text-slate-600">${Number(product.salePrice).toLocaleString()}</td>
                 <td className="px-6 py-4">
-                  <span className={`${(product.inventory?.[0]?.stock || 0) <= (product.minStock || 0) ? 'text-red-600 font-medium' : 'text-slate-600'}`}>
-                    {Number(product.inventory?.[0]?.stock || 0)}
-                  </span>
+                  {(product.inventory?.[0]?.stock || 0) <= (product.minStock || 0) ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 font-medium">
+                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                      {Number(product.inventory?.[0]?.stock || 0)}
+                    </span>
+                  ) : (
+                    <span className="text-slate-600">{Number(product.inventory?.[0]?.stock || 0)}</span>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-slate-500 text-xs">{product.barcode || '-'}</td>
                 <td className="px-6 py-4">

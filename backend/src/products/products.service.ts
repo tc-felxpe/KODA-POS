@@ -143,6 +143,23 @@ export class ProductsService {
     }
   }
 
+  async findLowStock(tenantId: string) {
+    const products = await this.prisma.product.findMany({
+      where: { tenantId, active: true },
+      include: {
+        category: true,
+        brand: true,
+        inventory: { include: { branch: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return products.filter((p) => {
+      const totalStock = p.inventory.reduce((sum, inv) => sum + Number(inv.stock), 0);
+      return totalStock <= Number(p.minStock);
+    });
+  }
+
   async findAll(tenantId: string, search?: string) {
     return this.prisma.product.findMany({
       where: {

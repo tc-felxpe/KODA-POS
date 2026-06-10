@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
+import api from '@/lib/axios';
 
 /* ---------- Hook para detectar móvil ---------- */
 function useIsMobile() {
@@ -196,6 +197,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isMobile = useIsMobile();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [alertCount, setAlertCount] = useState(0);
 
   /* Inicializar estado según dispositivo y preferencia guardada */
   useEffect(() => {
@@ -221,6 +223,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.push('/login');
     }
   }, [user, router]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchAlerts = async () => {
+      try {
+        const res = await api.get('/products/low-stock');
+        setAlertCount(res.data?.length || 0);
+      } catch { /* ignore */ }
+    };
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   if (!user) {
     return (
@@ -312,11 +327,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div className="flex items-center gap-3">
             {/* Notificaciones */}
-            <button className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#7F00B2] transition-colors relative">
+            <button
+              onClick={() => router.push('/products')}
+              className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#7F00B2] transition-colors relative"
+              title={`${alertCount} producto(s) con stock bajo`}
+            >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full"></span>
+              {alertCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                  {alertCount > 9 ? '9+' : alertCount}
+                </span>
+              )}
             </button>
 
             {/* Avatar */}

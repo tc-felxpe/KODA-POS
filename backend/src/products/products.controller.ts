@@ -22,6 +22,11 @@ export class ProductsController {
     return this.productsService.findAll(tenantId, search);
   }
 
+  @Get('low-stock')
+  findLowStock(@TenantId() tenantId: string) {
+    return this.productsService.findLowStock(tenantId);
+  }
+
   // ─── CÓDIGOS DE BARRAS (debe ir ANTES de :id) ───
 
   @Get('barcode/generate')
