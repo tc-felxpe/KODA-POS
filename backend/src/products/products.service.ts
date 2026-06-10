@@ -6,9 +6,11 @@ export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
   async create(tenantId: string, data: any) {
+    const { initialStock, branchId, ...productData } = data;
+
     const product = await this.prisma.product.create({
       data: {
-        ...data,
+        ...productData,
         tenantId,
       },
     });
@@ -18,29 +20,47 @@ export class ProductsService {
       data: {
         tenantId,
         productId: product.id,
-        stock: 0,
+        branchId: branchId || null,
+        stock: initialStock || 0,
       },
     });
 
-    return product;
+    // Si hay stock inicial, registrar movimiento de entrada
+    if (initialStock && initialStock > 0) {
+      await this.prisma.inventoryMovement.create({
+        data: {
+          tenantId,
+          productId: product.id,
+          type: 'ADJUSTMENT',
+          quantity: initialStock,
+          stockBefore: 0,
+          stockAfter: initialStock,
+          reason: 'Stock inicial al crear producto',
+        },
+      });
+    }
+
+    return this.findOne(product.id, tenantId);
   }
 
   async findAll(tenantId: string, search?: string) {
     return this.prisma.product.findMany({
       where: {
         tenantId,
+        active: true,
         ...(search && {
           OR: [
-            { name: { contains: search } },
-            { sku: { contains: search } },
-            { barcode: { contains: search } },
+            { name: { contains: search, mode: 'insensitive' } },
+            { sku: { contains: search, mode: 'insensitive' } },
+            { barcode: { contains: search, mode: 'insensitive' } },
           ],
         }),
       },
       include: {
         category: true,
         brand: true,
-        inventory: true,
+        supplier: true,
+        inventory: { include: { branch: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -52,7 +72,8 @@ export class ProductsService {
       include: {
         category: true,
         brand: true,
-        inventory: true,
+        supplier: true,
+        inventory: { include: { branch: true } },
         variants: true,
       },
     });

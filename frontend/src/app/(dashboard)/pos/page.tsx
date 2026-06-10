@@ -10,6 +10,7 @@ import PaymentModal from '@/components/PaymentModal';
 import ReturnModal from '@/components/ReturnModal';
 import CancelModal from '@/components/CancelModal';
 import TicketModal from '@/components/TicketModal';
+import QuotationsLayawaysModal from '@/components/QuotationsLayawaysModal';
 
 /* ---------- Tipos ---------- */
 interface Product {
@@ -110,6 +111,9 @@ export default function POSPage() {
   const [showTicket, setShowTicket] = useState(false);
   const [lastTicket, setLastTicket] = useState<any>(null);
   const [saleSuccess, setSaleSuccess] = useState(false);
+  const [showQuotations, setShowQuotations] = useState(false);
+  const [showLayaways, setShowLayaways] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<'sale' | 'quotation' | 'layaway'>('sale');
   const [allowNegativeStock, setAllowNegativeStock] = useState(false);
   const [stockError, setStockError] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
@@ -146,10 +150,10 @@ export default function POSPage() {
     }
   }, []);
 
-  /* Finalizar venta */
-  const handleFinishSale = async (payments: any[]) => {
+  /* Finalizar venta / cotización / apartado */
+  const handleFinishSale = async (payments: any[], mode: 'sale' | 'quotation' | 'layaway' = 'sale') => {
     try {
-      const res = await api.post('/sales', {
+      const payload = {
         customerId: cart.client?.id,
         items: cart.items.map((i) => ({
           productId: i.productId,
@@ -158,7 +162,7 @@ export default function POSPage() {
           discount: i.discountType === 'percent' ? (i.salePrice * i.quantity * i.discount) / 100 : i.discount * i.quantity,
           tax: ((i.salePrice * i.quantity - (i.discountType === 'percent' ? (i.salePrice * i.quantity * i.discount) / 100 : i.discount * i.quantity)) * i.tax) / 100,
         })),
-        payments: payments.map((p) => ({
+        payments: mode === 'quotation' ? [] : payments.map((p) => ({
           paymentMethodId: p.paymentMethodId,
           amount: p.amount,
           reference: p.reference,
@@ -168,12 +172,18 @@ export default function POSPage() {
         tax: cart.getTotalTax(),
         total: cart.getTotal(),
         notes: cart.observations,
-      });
+        status: mode === 'quotation' ? 'QUOTATION' : mode === 'layaway' ? 'LAYAWAY' : 'COMPLETED',
+        paymentStatus: mode === 'quotation' ? 'PENDING' : mode === 'layaway' ? 'PARTIAL' : 'PAID',
+      };
+
+      const res = await api.post('/sales', payload);
       cart.clearCart();
       setShowPayment(false);
 
       /* Preparar ticket */
       const saleData = res.data;
+      const isQuoteOrLayaway = mode === 'quotation' || mode === 'layaway';
+
       setLastTicket({
         saleNumber: saleData.saleNumber,
         date: saleData.createdAt,
@@ -190,17 +200,22 @@ export default function POSPage() {
         discount: Number(saleData.discount),
         tax: Number(saleData.tax),
         total: Number(saleData.total),
-        payments: saleData.payments.map((p: any) => ({
+        payments: saleData.payments?.map((p: any) => ({
           method: p.paymentMethod?.name || 'Pago',
           amount: Number(p.amount),
-        })),
+        })) || [],
+        isQuotation: mode === 'quotation',
+        isLayaway: mode === 'layaway',
       });
-      setShowTicket(true);
+
+      if (!isQuoteOrLayaway) {
+        setShowTicket(true);
+      }
       setSaleSuccess(true);
       setTimeout(() => setSaleSuccess(false), 3000);
       fetchProducts('');
-    } catch (err) {
-      alert('Error al registrar la venta');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Error al registrar');
     }
   };
 
@@ -610,6 +625,32 @@ export default function POSPage() {
               </span>
             </button>
           )}
+          <button
+            onClick={() => { setPaymentMode('quotation'); setShowPayment(true); }}
+            disabled={cart.items.length === 0}
+            className="flex-1 py-2.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-medium hover:bg-blue-100 disabled:opacity-40 transition-colors"
+          >
+            Cotizar
+          </button>
+          <button
+            onClick={() => { setPaymentMode('layaway'); setShowPayment(true); }}
+            disabled={cart.items.length === 0}
+            className="flex-1 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-xs font-medium hover:bg-orange-100 disabled:opacity-40 transition-colors"
+          >
+            Apartar
+          </button>
+          <button
+            onClick={() => setShowQuotations(true)}
+            className="flex-1 py-2.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-medium hover:bg-blue-100 transition-colors"
+          >
+            Ver cotizaciones
+          </button>
+          <button
+            onClick={() => setShowLayaways(true)}
+            className="flex-1 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-xs font-medium hover:bg-orange-100 transition-colors"
+          >
+            Ver apartados
+          </button>
         </div>
 
         {/* Descuento global */}
@@ -766,7 +807,7 @@ export default function POSPage() {
             </div>
 
             {/* Acciones */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => { setShowCartMobile(false); setShowPromotions(true); }}
                 disabled={cart.items.length === 0}
@@ -780,6 +821,34 @@ export default function POSPage() {
                 className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium disabled:opacity-40"
               >
                 Suspender
+              </button>
+              <button
+                onClick={() => { setShowCartMobile(false); setPaymentMode('quotation'); setShowPayment(true); }}
+                disabled={cart.items.length === 0}
+                className="flex-1 py-2.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-medium disabled:opacity-40"
+              >
+                Cotizar
+              </button>
+              <button
+                onClick={() => { setShowCartMobile(false); setPaymentMode('layaway'); setShowPayment(true); }}
+                disabled={cart.items.length === 0}
+                className="flex-1 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-xs font-medium disabled:opacity-40"
+              >
+                Apartar
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowCartMobile(false); setShowQuotations(true); }}
+                className="flex-1 py-2.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-medium"
+              >
+                Ver cotizaciones
+              </button>
+              <button
+                onClick={() => { setShowCartMobile(false); setShowLayaways(true); }}
+                className="flex-1 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-xs font-medium"
+              >
+                Ver apartados
               </button>
             </div>
 
@@ -1127,6 +1196,23 @@ export default function POSPage() {
           total={total}
           onConfirm={handleFinishSale}
           onClose={() => setShowPayment(false)}
+          initialMode={paymentMode}
+        />
+      )}
+
+      {/* ========== MODAL COTIZACIONES ========== */}
+      {showQuotations && (
+        <QuotationsLayawaysModal
+          type="quotation"
+          onClose={() => setShowQuotations(false)}
+        />
+      )}
+
+      {/* ========== MODAL APARTADOS ========== */}
+      {showLayaways && (
+        <QuotationsLayawaysModal
+          type="layaway"
+          onClose={() => setShowLayaways(false)}
         />
       )}
 
@@ -1167,7 +1253,9 @@ export default function POSPage() {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <span className="text-sm font-medium">Venta registrada exitosamente</span>
+          <span className="text-sm font-medium">
+            {paymentMode === 'quotation' ? 'Cotización guardada' : paymentMode === 'layaway' ? 'Apartado registrado' : 'Venta registrada exitosamente'}
+          </span>
         </div>
       )}
 

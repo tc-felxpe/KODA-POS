@@ -62,4 +62,20 @@ export class CreateSaleDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @IsString()
+  @IsOptional()
+  status?: 'COMPLETED' | 'QUOTATION' | 'LAYAWAY';
+
+  @IsString()
+  @IsOptional()
+  paymentStatus?: 'PENDING' | 'PARTIAL' | 'PAID';
+
+  @IsNumber()
+  @IsOptional()
+  deposit?: number;
+
+  @IsString()
+  @IsOptional()
+  dueDate?: string;
 }

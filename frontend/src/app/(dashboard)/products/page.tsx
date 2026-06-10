@@ -2,61 +2,129 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/axios';
+import Link from 'next/link';
+
+interface Category { id: string; name: string; }
+interface Brand { id: string; name: string; }
+interface Supplier { id: string; name: string; }
+interface Branch { id: string; name: string; }
+interface BusinessConfig {
+  businessType: string;
+  config: {
+    label: string;
+    fields: {
+      key: string;
+      label: string;
+      type: 'text' | 'number' | 'date' | 'select';
+      options?: string[];
+    }[];
+  };
+}
 
 interface Product {
   id: string;
   name: string;
   sku?: string;
   barcode?: string;
+  description?: string;
   salePrice: number;
   costPrice: number;
   minStock: number;
+  maxStock?: number;
+  unit?: string;
+  tax?: number;
+  location?: string;
+  imageUrl?: string;
   active: boolean;
   category?: { name: string };
-  inventory?: { stock: number }[];
+  brand?: { name: string };
+  supplier?: { name: string };
+  inventory?: { stock: number; branch?: { name: string } }[];
 }
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [businessConfig, setBusinessConfig] = useState<BusinessConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState({
-    name: '',
-    sku: '',
-    barcode: '',
-    salePrice: '',
-    costPrice: '',
-    minStock: '',
+    name: '', sku: '', barcode: '', description: '',
+    salePrice: '', costPrice: '', minStock: '', maxStock: '',
+    unit: 'UNIDAD', tax: '', categoryId: '', brandId: '',
+    supplierId: '', location: '', imageUrl: '', active: true,
+    initialStock: '', branchId: '',
+    attributes: {} as Record<string, string>,
   });
 
   const fetchProducts = async () => {
+    setLoading(true);
     try {
       const res = await api.get('/products', { params: { search } });
       setProducts(res.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchProducts();
-  }, [search]);
+  const fetchOptions = async () => {
+    try {
+      const [catRes, brandRes, supRes, branchRes, configRes] = await Promise.all([
+        api.get('/categories'),
+        api.get('/brands'),
+        api.get('/suppliers'),
+        api.get('/branches'),
+        api.get('/tenants/business-config'),
+      ]);
+      setCategories(catRes.data);
+      setBrands(brandRes.data);
+      setSuppliers(supRes.data);
+      setBranches(branchRes.data);
+      setBusinessConfig(configRes.data);
+    } catch (err) { console.error(err); }
+  };
+
+  useEffect(() => { fetchProducts(); }, [search]);
+  useEffect(() => { fetchOptions(); }, []);
+
+  const resetForm = () => {
+    setForm({
+      name: '', sku: '', barcode: '', description: '',
+      salePrice: '', costPrice: '', minStock: '', maxStock: '',
+      unit: 'UNIDAD', tax: '', categoryId: '', brandId: '',
+      supplierId: '', location: '', imageUrl: '', active: true,
+      initialStock: '', branchId: '',
+      attributes: {} as Record<string, string>,
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const data = {
+    const data: any = {
       name: form.name,
       sku: form.sku || undefined,
       barcode: form.barcode || undefined,
+      description: form.description || undefined,
       salePrice: form.salePrice ? parseFloat(form.salePrice) : 0,
       costPrice: form.costPrice ? parseFloat(form.costPrice) : 0,
       minStock: form.minStock ? parseFloat(form.minStock) : 0,
+      maxStock: form.maxStock ? parseFloat(form.maxStock) : undefined,
+      unit: form.unit || undefined,
+      tax: form.tax ? parseFloat(form.tax) : undefined,
+      categoryId: form.categoryId || undefined,
+      brandId: form.brandId || undefined,
+      supplierId: form.supplierId || undefined,
+      location: form.location || undefined,
+      imageUrl: form.imageUrl || undefined,
+      active: form.active,
+      attributes: form.attributes && Object.keys(form.attributes).length > 0 ? form.attributes : undefined,
+      initialStock: form.initialStock ? parseFloat(form.initialStock) : undefined,
+      branchId: form.branchId || undefined,
     };
-
     try {
       if (editing) {
         await api.patch(`/products/${editing.id}`, data);
@@ -65,7 +133,7 @@ export default function ProductsPage() {
       }
       setShowForm(false);
       setEditing(null);
-      setForm({ name: '', sku: '', barcode: '', salePrice: '', costPrice: '', minStock: '' });
+      resetForm();
       fetchProducts();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Error al guardar');
@@ -78,9 +146,22 @@ export default function ProductsPage() {
       name: product.name,
       sku: product.sku || '',
       barcode: product.barcode || '',
+      description: product.description || '',
       salePrice: product.salePrice?.toString() || '',
       costPrice: product.costPrice?.toString() || '',
       minStock: product.minStock?.toString() || '',
+      maxStock: product.maxStock?.toString() || '',
+      unit: product.unit || 'UNIDAD',
+      tax: product.tax?.toString() || '',
+      categoryId: product.category ? (product as any).categoryId || '' : '',
+      brandId: product.brand ? (product as any).brandId || '' : '',
+      supplierId: product.supplier ? (product as any).supplierId || '' : '',
+      location: product.location || '',
+      imageUrl: product.imageUrl || '',
+      active: product.active,
+      initialStock: '',
+      branchId: '',
+      attributes: (product as any).attributes ? (product as any).attributes : {} as Record<string, string>,
     });
     setShowForm(true);
   };
@@ -98,88 +179,240 @@ export default function ProductsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#7F00B2]" />
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Productos</h1>
-          <p className="text-slate-500">Gestiona tu catálogo de productos</p>
+          <h1 className="text-2xl font-bold text-[#1B004B]">Productos</h1>
+          <p className="text-slate-500 text-sm">Gestiona tu catálogo de productos</p>
         </div>
         <button
-          onClick={() => { setShowForm(true); setEditing(null); setForm({ name: '', sku: '', barcode: '', salePrice: '', costPrice: '', minStock: '' }); }}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+          onClick={() => { setShowForm(true); setEditing(null); resetForm(); }}
+          className="px-4 py-2.5 bg-[#7F00B2] hover:bg-[#4C007D] text-white font-medium rounded-xl transition-colors text-sm"
         >
           + Nuevo producto
         </button>
       </div>
 
+      {/* Navegación secundaria */}
+      <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
+        <Link href="/products" className="px-4 py-2 bg-[#1B004B] text-white rounded-xl text-sm font-medium whitespace-nowrap">Productos</Link>
+        <Link href="/categories" className="px-4 py-2 bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-medium whitespace-nowrap transition-colors">Categorías</Link>
+        <Link href="/brands" className="px-4 py-2 bg-white text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-medium whitespace-nowrap transition-colors">Marcas</Link>
+      </div>
+
+      {/* Búsqueda */}
       <div className="mb-6">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar producto..."
-          className="w-full max-w-md px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+          className="w-full max-w-md px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8] focus:ring-2 focus:ring-[#F3E8FF]"
         />
       </div>
 
+      {/* Modal formulario */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-lg">
-            <h2 className="text-lg font-bold mb-4">{editing ? 'Editar producto' : 'Nuevo producto'}</h2>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-2xl my-8">
+            <h2 className="text-lg font-bold text-[#1B004B] mb-4">{editing ? 'Editar producto' : 'Nuevo producto'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
-                <input value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg" required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+              {/* Info básica */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
+                  <input value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" required />
+                </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">SKU</label>
-                  <input value={form.sku} onChange={(e) => setForm({...form, sku: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">SKU (Código interno)</label>
+                  <input value={form.sku} onChange={(e) => setForm({...form, sku: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Código de barras</label>
-                  <input value={form.barcode} onChange={(e) => setForm({...form, barcode: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                  <input value={form.barcode} onChange={(e) => setForm({...form, barcode: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
+                  <textarea value={form.description} onChange={(e) => setForm({...form, description: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8] resize-none" rows={2} />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+
+              {/* Categoría, Marca, Proveedor */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Precio venta</label>
-                  <input type="number" value={form.salePrice} onChange={(e) => setForm({...form, salePrice: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
+                  <select value={form.categoryId} onChange={(e) => setForm({...form, categoryId: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]">
+                    <option value="">Sin categoría</option>
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Marca</label>
+                  <select value={form.brandId} onChange={(e) => setForm({...form, brandId: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]">
+                    <option value="">Sin marca</option>
+                    {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor</label>
+                  <select value={form.supplierId} onChange={(e) => setForm({...form, supplierId: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]">
+                    <option value="">Sin proveedor</option>
+                    {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Info comercial */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Precio costo</label>
-                  <input type="number" value={form.costPrice} onChange={(e) => setForm({...form, costPrice: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                  <input type="number" value={form.costPrice} onChange={(e) => setForm({...form, costPrice: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Stock mínimo</label>
-                  <input type="number" value={form.minStock} onChange={(e) => setForm({...form, minStock: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Precio venta</label>
+                  <input type="number" value={form.salePrice} onChange={(e) => setForm({...form, salePrice: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Impuesto (%)</label>
+                  <input type="number" value={form.tax} onChange={(e) => setForm({...form, tax: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Unidad</label>
+                  <select value={form.unit} onChange={(e) => setForm({...form, unit: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]">
+                    <option value="UNIDAD">Unidad</option>
+                    <option value="KG">Kilogramo</option>
+                    <option value="GR">Gramo</option>
+                    <option value="LB">Libra</option>
+                    <option value="LT">Litro</option>
+                    <option value="ML">Mililitro</option>
+                    <option value="M">Metro</option>
+                    <option value="CM">Centímetro</option>
+                    <option value="PZ">Pieza</option>
+                    <option value="CJ">Caja</option>
+                  </select>
                 </div>
               </div>
+
+              {/* Info inventario */}
+              {!editing && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Stock inicial</label>
+                    <input type="number" value={form.initialStock} onChange={(e) => setForm({...form, initialStock: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Bodega</label>
+                    <select value={form.branchId} onChange={(e) => setForm({...form, branchId: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]">
+                      <option value="">Por defecto</option>
+                      {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Stock mínimo</label>
+                    <input type="number" value={form.minStock} onChange={(e) => setForm({...form, minStock: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Stock máximo</label>
+                    <input type="number" value={form.maxStock} onChange={(e) => setForm({...form, maxStock: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+                  </div>
+                </div>
+              )}
+
+              {editing && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Stock mínimo</label>
+                    <input type="number" value={form.minStock} onChange={(e) => setForm({...form, minStock: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Stock máximo</label>
+                    <input type="number" value={form.maxStock} onChange={(e) => setForm({...form, maxStock: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Ubicación</label>
+                    <input value={form.location} onChange={(e) => setForm({...form, location: e.target.value})} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]" />
+                  </div>
+                </div>
+              )}
+
+              {/* Estado */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-slate-700">Estado:</span>
+                <button
+                  type="button"
+                  onClick={() => setForm({...form, active: !form.active})}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${form.active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}
+                >
+                  {form.active ? 'Activo' : 'Inactivo'}
+                </button>
+              </div>
+
+              {/* Campos dinámicos según tipo de negocio */}
+              {businessConfig && businessConfig.config.fields.length > 0 && (
+                <div className="border-t border-slate-100 pt-4 mt-2">
+                  <p className="text-xs font-semibold text-[#7F00B2] uppercase tracking-wider mb-3">
+                    {businessConfig.config.label}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {businessConfig.config.fields.map((field) => (
+                      <div key={field.key}>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">{field.label}</label>
+                        {field.type === 'select' ? (
+                          <select
+                            value={form.attributes[field.key] || ''}
+                            onChange={(e) => setForm({
+                              ...form,
+                              attributes: { ...form.attributes, [field.key]: e.target.value }
+                            })}
+                            className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]"
+                          >
+                            <option value="">Seleccionar</option>
+                            {field.options?.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        ) : (
+                          <input
+                            type={field.type}
+                            value={form.attributes[field.key] || ''}
+                            onChange={(e) => setForm({
+                              ...form,
+                              attributes: { ...form.attributes, [field.key]: e.target.value }
+                            })}
+                            className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#BC4ED8]"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-2">
-                <button type="submit" className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Guardar</button>
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg">Cancelar</button>
+                <button type="submit" className="flex-1 py-2.5 bg-[#7F00B2] hover:bg-[#4C007D] text-white rounded-xl text-sm font-medium">Guardar</button>
+                <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium">Cancelar</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      {/* Tabla */}
+      <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
+          <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
-              <th className="px-6 py-3 font-medium text-slate-700">Producto</th>
-              <th className="px-6 py-3 font-medium text-slate-700">SKU</th>
-              <th className="px-6 py-3 font-medium text-slate-700">Precio</th>
-              <th className="px-6 py-3 font-medium text-slate-700">Stock</th>
-              <th className="px-6 py-3 font-medium text-slate-700">Estado</th>
-              <th className="px-6 py-3 font-medium text-slate-700 text-right">Acciones</th>
+              <th className="px-6 py-3.5 font-semibold text-slate-600">Producto</th>
+              <th className="px-6 py-3.5 font-semibold text-slate-600">SKU</th>
+              <th className="px-6 py-3.5 font-semibold text-slate-600">Precio</th>
+              <th className="px-6 py-3.5 font-semibold text-slate-600">Stock</th>
+              <th className="px-6 py-3.5 font-semibold text-slate-600">Estado</th>
+              <th className="px-6 py-3.5 font-semibold text-slate-600 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -187,15 +420,18 @@ export default function ProductsPage() {
               <tr key={product.id} className="hover:bg-slate-50">
                 <td className="px-6 py-4">
                   <div>
-                    <p className="font-medium text-slate-900">{product.name}</p>
-                    {product.category && <p className="text-xs text-slate-500">{product.category.name}</p>}
+                    <p className="font-medium text-[#1B004B]">{product.name}</p>
+                    <div className="flex gap-2 text-xs text-slate-400">
+                      {product.category && <span>{product.category.name}</span>}
+                      {product.brand && <span>• {product.brand.name}</span>}
+                    </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-slate-600">{product.sku || '-'}</td>
-                <td className="px-6 py-4 text-slate-600">${product.salePrice?.toLocaleString()}</td>
+                <td className="px-6 py-4 text-slate-500">{product.sku || '-'}</td>
+                <td className="px-6 py-4 text-slate-600">${Number(product.salePrice).toLocaleString()}</td>
                 <td className="px-6 py-4">
                   <span className={`${(product.inventory?.[0]?.stock || 0) <= (product.minStock || 0) ? 'text-red-600 font-medium' : 'text-slate-600'}`}>
-                    {product.inventory?.[0]?.stock || 0}
+                    {Number(product.inventory?.[0]?.stock || 0)}
                   </span>
                 </td>
                 <td className="px-6 py-4">
@@ -203,9 +439,9 @@ export default function ProductsPage() {
                     {product.active ? 'Activo' : 'Inactivo'}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-right">
-                  <button onClick={() => handleEdit(product)} className="text-blue-600 hover:text-blue-800 text-sm mr-3">Editar</button>
-                  <button onClick={() => handleDelete(product.id)} className="text-red-600 hover:text-red-800 text-sm">Eliminar</button>
+                <td className="px-6 py-4 text-right space-x-3">
+                  <button onClick={() => handleEdit(product)} className="text-[#7F00B2] hover:text-[#4C007D] text-sm font-medium">Editar</button>
+                  <button onClick={() => handleDelete(product.id)} className="text-red-500 hover:text-red-700 text-sm font-medium">Eliminar</button>
                 </td>
               </tr>
             ))}

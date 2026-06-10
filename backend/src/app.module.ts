@@ -8,8 +8,11 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { ProductsModule } from './products/products.module';
+import { CategoriesModule } from './categories/categories.module';
+import { BrandsModule } from './brands/brands.module';
 import { CustomersModule } from './customers/customers.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
+import { BranchesModule } from './branches/branches.module';
 import { SalesModule } from './sales/sales.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -23,8 +26,11 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     UsersModule,
     TenantsModule,
     ProductsModule,
+    CategoriesModule,
+    BrandsModule,
     CustomersModule,
     SuppliersModule,
+    BranchesModule,
     SalesModule,
   ],
   controllers: [AppController],

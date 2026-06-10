@@ -44,6 +44,18 @@ export class CreateProductDto {
   @IsOptional()
   unit?: string;
 
+  @IsNumber()
+  @IsOptional()
+  tax?: number;
+
+  @IsUUID()
+  @IsOptional()
+  supplierId?: string;
+
+  @IsString()
+  @IsOptional()
+  location?: string;
+
   @IsString()
   @IsOptional()
   imageUrl?: string;
@@ -51,4 +63,16 @@ export class CreateProductDto {
   @IsBoolean()
   @IsOptional()
   active?: boolean;
+
+  @IsOptional()
+  attributes?: Record<string, any>;
+
+  /* Stock inicial al crear producto */
+  @IsNumber()
+  @IsOptional()
+  initialStock?: number;
+
+  @IsUUID()
+  @IsOptional()
+  branchId?: string;
 }

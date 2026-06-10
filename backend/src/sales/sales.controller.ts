@@ -51,4 +51,23 @@ export class SalesController {
     }
     return this.salesService.cancelSale(tenantId, saleId, req.user.userId, body.reason);
   }
+
+  @Get('quotations')
+  getQuotations(@TenantId() tenantId: string) {
+    return this.salesService.findAll(tenantId, 'QUOTATION');
+  }
+
+  @Get('layaways')
+  getLayaways(@TenantId() tenantId: string) {
+    return this.salesService.findAll(tenantId, 'LAYAWAY');
+  }
+
+  @Post(':id/convert')
+  convertToSale(
+    @Param('id') saleId: string,
+    @TenantId() tenantId: string,
+    @Request() req: any,
+  ) {
+    return this.salesService.convertToSale(tenantId, saleId, req.user.userId);
+  }
 }

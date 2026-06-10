@@ -14,6 +14,11 @@ export class SalesService {
       where: { tenantId },
     });
 
+    const status = dto.status || 'COMPLETED';
+    const isCompleted = status === 'COMPLETED';
+    const isLayaway = status === 'LAYAWAY';
+    const shouldDeductStock = isCompleted || isLayaway;
+
     const sale = await this.prisma.sale.create({
       data: {
         tenantId,
@@ -26,8 +31,8 @@ export class SalesService {
         tax: dto.tax,
         total: dto.total,
         notes: dto.notes,
-        status: 'COMPLETED',
-        paymentStatus: dto.payments.length > 1 ? 'PARTIAL' : 'PAID',
+        status,
+        paymentStatus: dto.paymentStatus || (isCompleted ? (dto.payments.length > 1 ? 'PARTIAL' : 'PAID') : 'PENDING'),
         details: {
           create: dto.items.map((item) => ({
             tenantId,
@@ -54,27 +59,30 @@ export class SalesService {
       },
     });
 
-    /* Descontar stock del inventario */
-    for (const item of dto.items) {
-      const inventory = await this.prisma.inventory.findFirst({
-        where: { productId: item.productId, tenantId },
-      });
-      if (inventory) {
-        await this.prisma.inventory.update({
-          where: { id: inventory.id },
-          data: { stock: { decrement: item.quantity } },
+    /* Descontar stock del inventario para ventas completadas y apartados */
+    if (shouldDeductStock) {
+      for (const item of dto.items) {
+        const inventory = await this.prisma.inventory.findFirst({
+          where: { productId: item.productId, tenantId },
         });
+        if (inventory) {
+          await this.prisma.inventory.update({
+            where: { id: inventory.id },
+            data: { stock: { decrement: item.quantity } },
+          });
+        }
       }
     }
 
     return sale;
   }
 
-  async findAll(tenantId: string, search?: string) {
+  async findAll(tenantId: string, statusFilter?: string, search?: string) {
     return this.prisma.sale.findMany({
       where: {
         tenantId,
-        ...(search && {
+        ...(statusFilter && { status: statusFilter as any }),
+        ...(search && !statusFilter && {
           OR: [
             { saleNumber: { contains: search } },
             { customer: { firstName: { contains: search } } },
@@ -89,6 +97,49 @@ export class SalesService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async convertToSale(tenantId: string, saleId: string, userId: string) {
+    const sale = await this.prisma.sale.findFirst({
+      where: { id: saleId, tenantId },
+      include: { details: true },
+    });
+    if (!sale) throw new Error('Venta no encontrada');
+    if (sale.status !== 'QUOTATION' && sale.status !== 'LAYAWAY') {
+      throw new Error('Solo cotizaciones o apartados pueden convertirse');
+    }
+
+    await this.prisma.sale.update({
+      where: { id: saleId },
+      data: { status: 'COMPLETED', paymentStatus: 'PAID' },
+    });
+
+    /* Descontar stock */
+    for (const detail of sale.details) {
+      const inventory = await this.prisma.inventory.findFirst({
+        where: { productId: detail.productId, tenantId },
+      });
+      if (inventory) {
+        await this.prisma.inventory.update({
+          where: { id: inventory.id },
+          data: { stock: { decrement: Number(detail.quantity) } },
+        });
+      }
+    }
+
+    /* Auditoría */
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId,
+        action: 'SALE_CONVERT',
+        entity: 'Sale',
+        entityId: saleId,
+        newValues: { fromStatus: sale.status },
+      },
+    });
+
+    return { success: true };
   }
 
   async getPaymentMethods(tenantId: string) {

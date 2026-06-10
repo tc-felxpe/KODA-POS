@@ -21,4 +21,11 @@ export class TenantsService {
       },
     });
   }
+
+  async update(id: string, data: { businessType?: string; name?: string; legalName?: string; taxId?: string; phone?: string; address?: string; logoUrl?: string }) {
+    return this.prisma.tenant.update({
+      where: { id },
+      data,
+    });
+  }
 }
