@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/axios';
 import Link from 'next/link';
+import LabelPrintModal from '@/components/LabelPrintModal';
 
 interface Category { id: string; name: string; }
 interface Brand { id: string; name: string; }
@@ -66,6 +67,7 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [labelProduct, setLabelProduct] = useState<Product | null>(null);
   const [form, setForm] = useState({
     name: '', sku: '', barcode: '', description: '',
     salePrice: '', costPrice: '', minStock: '', maxStock: '',
@@ -721,13 +723,14 @@ export default function ProductsPage() {
                 </td>
                 <td className="px-6 py-4 text-right space-x-3">
                   <button onClick={() => handleEdit(product)} className="text-[#7F00B2] hover:text-[#4C007D] text-sm font-medium">Editar</button>
+                  <button onClick={() => setLabelProduct(product)} className="text-slate-500 hover:text-[#7F00B2] text-sm font-medium">Etiqueta</button>
                   <button onClick={() => handleDelete(product.id)} className="text-red-500 hover:text-red-700 text-sm font-medium">Eliminar</button>
                 </td>
               </tr>
             ))}
             {products.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
                   No hay productos registrados. Crea el primero.
                 </td>
               </tr>
@@ -735,6 +738,14 @@ export default function ProductsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Modal de impresión de etiquetas */}
+      {labelProduct && (
+        <LabelPrintModal
+          product={labelProduct}
+          onClose={() => setLabelProduct(null)}
+        />
+      )}
     </div>
   );
 }
