@@ -15,6 +15,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
 import { BranchesModule } from './branches/branches.module';
 import { SalesModule } from './sales/sales.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { PurchasesModule } from './purchases/purchases.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
@@ -34,6 +35,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     BranchesModule,
     SalesModule,
     InventoryModule,
+    PurchasesModule,
   ],
   controllers: [AppController],
   providers: [
