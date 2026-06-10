@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import api from '@/lib/axios';
 import { useCart } from '@/hooks/useCart';
+import { DEFAULT_PROMOTIONS, calculatePromotions } from '@/hooks/usePromotions';
 import { useAuth } from '@/hooks/useAuth';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import PaymentModal from '@/components/PaymentModal';
@@ -302,9 +303,15 @@ export default function POSPage() {
   const subtotal = cart.getSubtotal();
   const totalDiscount = cart.getTotalDiscount();
   const globalDiscount = cart.getGlobalDiscount();
+  const promoDiscount = cart.getPromoDiscount();
   const totalTax = cart.getTotalTax();
   const total = cart.getTotal();
   const itemCount = cart.getItemCount();
+
+  const appliedPromos = calculatePromotions(
+    cart.items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, salePrice: i.salePrice })),
+    cart.activePromotions
+  );
 
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col lg:flex-row gap-4">
@@ -638,6 +645,12 @@ export default function POSPage() {
               <span className="font-medium">-${totalDiscount.toLocaleString()}</span>
             </div>
           )}
+          {promoDiscount > 0 && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span>Promociones</span>
+              <span className="font-medium">-${promoDiscount.toLocaleString()}</span>
+            </div>
+          )}
           {globalDiscount > 0 && (
             <div className="flex justify-between text-sm text-red-500">
               <span>Desc. global</span>
@@ -788,6 +801,12 @@ export default function POSPage() {
                 <span className="font-medium">-${totalDiscount.toLocaleString()}</span>
               </div>
             )}
+            {promoDiscount > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Promociones</span>
+                <span className="font-medium">-${promoDiscount.toLocaleString()}</span>
+              </div>
+            )}
             {totalTax > 0 && (
               <div className="flex justify-between text-sm text-slate-500">
                 <span>Impuestos</span>
@@ -868,7 +887,7 @@ export default function POSPage() {
       {/* ========== MODAL PROMOCIONES ========== */}
       {showPromotions && (
         <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-[#1B004B]">Promociones</h3>
               <button
@@ -881,36 +900,109 @@ export default function POSPage() {
                 </svg>
               </button>
             </div>
+
+            {/* Promociones activas */}
+            {appliedPromos.length > 0 && (
+              <div className="mb-4 p-3 bg-green-50 rounded-xl">
+                <p className="text-xs text-green-700 font-medium mb-1">Promociones aplicadas:</p>
+                {appliedPromos.map((p) => (
+                  <div key={p.promotionId} className="flex justify-between text-sm">
+                    <span className="text-green-800">{p.name}</span>
+                    <span className="font-bold text-green-700">-${p.discount.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Combos */}
             <div className="space-y-3">
-              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Descuento por porcentaje</p>
+              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Combos</p>
+              <div className="grid grid-cols-3 gap-2">
+                {DEFAULT_PROMOTIONS.filter((p) => p.type === 'combo').map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => cart.togglePromotion(p.id)}
+                    className={`py-3 rounded-xl text-sm font-medium transition-colors ${
+                      cart.activePromotions.includes(p.id)
+                        ? 'bg-[#1B004B] text-white'
+                        : 'bg-slate-50 text-[#1B004B] hover:bg-[#F3E8FF] hover:text-[#7F00B2]'
+                    }`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider pt-2">Precios especiales</p>
+              <div className="space-y-2">
+                {DEFAULT_PROMOTIONS.filter((p) => p.type === 'bulk_price').map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => cart.togglePromotion(p.id)}
+                    className={`w-full py-3 rounded-xl text-sm font-medium transition-colors ${
+                      cart.activePromotions.includes(p.id)
+                        ? 'bg-[#1B004B] text-white'
+                        : 'bg-slate-50 text-[#1B004B] hover:bg-[#F3E8FF] hover:text-[#7F00B2]'
+                    }`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider pt-2">Descuento por cantidad</p>
+              <div className="space-y-2">
+                {DEFAULT_PROMOTIONS.filter((p) => p.type === 'bulk_discount').map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => cart.togglePromotion(p.id)}
+                    className={`w-full py-3 rounded-xl text-sm font-medium transition-colors ${
+                      cart.activePromotions.includes(p.id)
+                        ? 'bg-[#1B004B] text-white'
+                        : 'bg-slate-50 text-[#1B004B] hover:bg-[#F3E8FF] hover:text-[#7F00B2]'
+                    }`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider pt-2">Descuento global</p>
               <div className="grid grid-cols-3 gap-2">
                 {[10, 20, 30].map((p) => (
                   <button
                     key={p}
-                    onClick={() => { cart.setGlobalDiscount(p, 'percent'); setShowPromotions(false); }}
-                    className="py-3 bg-slate-50 rounded-xl text-sm font-medium text-[#1B004B] hover:bg-[#F3E8FF] hover:text-[#7F00B2] transition-colors"
+                    onClick={() => { cart.setGlobalDiscount(p, 'percent'); }}
+                    className={`py-3 rounded-xl text-sm font-medium transition-colors ${
+                      cart.globalDiscount === p && cart.globalDiscountType === 'percent'
+                        ? 'bg-[#1B004B] text-white'
+                        : 'bg-slate-50 text-[#1B004B] hover:bg-[#F3E8FF] hover:text-[#7F00B2]'
+                    }`}
                   >
                     {p}%
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider pt-2">Descuento por valor</p>
               <div className="grid grid-cols-2 gap-2">
                 {[5000, 10000, 15000, 20000].map((v) => (
                   <button
                     key={v}
-                    onClick={() => { cart.setGlobalDiscount(v, 'value'); setShowPromotions(false); }}
-                    className="py-3 bg-slate-50 rounded-xl text-sm font-medium text-[#1B004B] hover:bg-[#F3E8FF] hover:text-[#7F00B2] transition-colors"
+                    onClick={() => { cart.setGlobalDiscount(v, 'value'); }}
+                    className={`py-3 rounded-xl text-sm font-medium transition-colors ${
+                      cart.globalDiscount === v && cart.globalDiscountType === 'value'
+                        ? 'bg-[#1B004B] text-white'
+                        : 'bg-slate-50 text-[#1B004B] hover:bg-[#F3E8FF] hover:text-[#7F00B2]'
+                    }`}
                   >
                     ${v.toLocaleString()}
                   </button>
                 ))}
               </div>
               <button
-                onClick={() => { cart.setGlobalDiscount(0, 'value'); setShowPromotions(false); }}
+                onClick={() => { cart.setGlobalDiscount(0, 'value'); }}
                 className="w-full py-3 text-sm text-red-500 hover:bg-red-50 rounded-xl transition-colors"
               >
-                Quitar descuento
+                Quitar descuento global
               </button>
             </div>
           </div>

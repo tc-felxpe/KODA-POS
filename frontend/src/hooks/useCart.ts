@@ -39,6 +39,7 @@ interface CartState {
   observations: string;
   globalDiscount: number;
   globalDiscountType: 'value' | 'percent';
+  activePromotions: string[];
   client: CartClient | null;
   suspendedSales: SuspendedSale[];
 
@@ -49,6 +50,7 @@ interface CartState {
   updateTax: (productId: string, tax: number) => void;
   setObservations: (text: string) => void;
   setGlobalDiscount: (discount: number, type: 'value' | 'percent') => void;
+  togglePromotion: (promoId: string) => void;
   setClient: (client: CartClient | null) => void;
   clearClient: () => void;
   clearCart: () => void;
@@ -61,6 +63,7 @@ interface CartState {
   getTotalDiscount: () => number;
   getGlobalDiscount: () => number;
   getTotalTax: () => number;
+  getPromoDiscount: () => number;
   getTotal: () => number;
   getItemCount: () => number;
 }
@@ -72,6 +75,7 @@ export const useCart = create<CartState>()(
       observations: '',
       globalDiscount: 0,
       globalDiscountType: 'value',
+      activePromotions: [],
       client: null,
       suspendedSales: [],
 
@@ -134,10 +138,19 @@ export const useCart = create<CartState>()(
 
       setGlobalDiscount: (discount, type) => set({ globalDiscount: discount, globalDiscountType: type }),
 
+      togglePromotion: (promoId: string) => set((state) => {
+        const exists = state.activePromotions.includes(promoId);
+        return {
+          activePromotions: exists
+            ? state.activePromotions.filter((id) => id !== promoId)
+            : [...state.activePromotions, promoId],
+        };
+      }),
+
       setClient: (client) => set({ client }),
       clearClient: () => set({ client: null }),
 
-      clearCart: () => set({ items: [], observations: '', globalDiscount: 0, globalDiscountType: 'value', client: null }),
+      clearCart: () => set({ items: [], observations: '', globalDiscount: 0, globalDiscountType: 'value', activePromotions: [], client: null }),
 
       suspendSale: () => {
         const state = get();
@@ -216,8 +229,15 @@ export const useCart = create<CartState>()(
         }, 0);
       },
 
-      getTotal: () => {
-        return get().getSubtotal() - get().getTotalDiscount() - get().getGlobalDiscount() + get().getTotalTax();
+      getPromoDiscount: () => {
+    const { calculatePromotions } = require('./usePromotions');
+    const items = get().items.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, salePrice: i.salePrice }));
+    const applied = calculatePromotions(items, get().activePromotions);
+    return applied.reduce((sum: number, a: { discount: number }) => sum + a.discount, 0);
+  },
+
+  getTotal: () => {
+    return get().getSubtotal() - get().getTotalDiscount() - get().getGlobalDiscount() - get().getPromoDiscount() + get().getTotalTax();
       },
 
       getItemCount: () => {
